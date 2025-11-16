@@ -1,0 +1,35 @@
+{
+  "name": "speck-marketplace",
+  "owner": {
+    "name": "Nathan Prabst",
+    "email": "nathan@example.com"
+  },
+  "metadata": {
+    "description": "Official Speck plugin marketplace for specification and planning tools",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "speck",
+      "source": {
+        "url": "https://github.com/nprbst/speck"
+      },
+      "description": "Specification and planning workflow framework for Claude Code",
+      "version": "1.0.0",
+      "author": {
+        "name": "Nathan Prabst"
+      },
+      "homepage": "https://github.com/nprbst/speck",
+      "repository": "https://github.com/nprbst/speck",
+      "license": "MIT",
+      "keywords": [
+        "specification",
+        "planning",
+        "workflow",
+        "feature-management"
+      ],
+      "category": "development-tools",
+      "strict": true
+    }
+  ]
+}

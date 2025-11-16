@@ -1,0 +1,23 @@
+{
+  "name": "speck",
+  "description": "Specification and planning workflow framework for Claude Code",
+  "version": "1.0.0",
+  "author": {
+    "name": "Nathan Prabst",
+    "email": "nathan@example.com"
+  },
+  "homepage": "https://github.com/nprbst/speck",
+  "repository": "https://github.com/nprbst/speck",
+  "license": "MIT",
+  "keywords": [
+    "specification",
+    "planning",
+    "workflow",
+    "feature-management",
+    "development-tools"
+  ],
+  "dependencies": {
+    "git": ">=2.30.0",
+    "shell": "bash"
+  }
+}
