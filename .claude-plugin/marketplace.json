@@ -11,9 +11,7 @@
   "plugins": [
     {
       "name": "speck",
-      "source": {
-        "url": "https://github.com/nprbst/speck"
-      },
+      "source": "./",
       "description": "Specification and planning workflow framework for Claude Code",
       "version": "1.0.0",
       "author": {
