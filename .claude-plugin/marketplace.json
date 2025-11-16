@@ -1,5 +1,5 @@
 {
-  "name": "speck-marketplace",
+  "name": "speck-market",
   "owner": {
     "name": "Nathan Prabst",
     "email": "nathan@example.com"
@@ -13,7 +13,7 @@
       "name": "speck",
       "source": "./",
       "description": "Specification and planning workflow framework for Claude Code",
-      "version": "1.0.0",
+      "version": "1.1.2",
       "author": {
         "name": "Nathan Prabst"
       },
