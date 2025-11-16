@@ -28,7 +28,7 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { getFeaturePaths } from "./common/paths";
+import { getFeaturePaths, getTemplatesDir } from "./common/paths";
 import { ExitCode } from "./contracts/cli-interface";
 
 /**
@@ -369,7 +369,7 @@ function updateAgentFile(
     mkdirSync(targetDir, { recursive: true });
   }
 
-  const templateFile = path.join(repoRoot, ".specify/templates/agent-file-template.md");
+  const templateFile = path.join(getTemplatesDir(), "agent-file-template.md");
 
   if (!existsSync(targetFile)) {
     // Create new file from template

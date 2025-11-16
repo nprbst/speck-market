@@ -30,6 +30,7 @@ import path from "node:path";
 import {
   getFeaturePaths,
   checkFeatureBranch,
+  getTemplatesDir,
 } from "./common/paths";
 import { ExitCode } from "./contracts/cli-interface";
 
@@ -95,7 +96,7 @@ async function main(args: string[]): Promise<number> {
   mkdirSync(paths.FEATURE_DIR, { recursive: true });
 
   // Copy plan template if it exists
-  const template = path.join(paths.REPO_ROOT, ".specify/templates/plan-template.md");
+  const template = path.join(getTemplatesDir(), "plan-template.md");
   if (existsSync(template)) {
     copyFileSync(template, paths.IMPL_PLAN);
     console.log(`Copied plan template to ${paths.IMPL_PLAN}`);

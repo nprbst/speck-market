@@ -38,6 +38,86 @@ export interface FeaturePaths {
 }
 
 /**
+ * Detect if running from a plugin installation
+ *
+ * Checks for CLAUDE_PLUGIN_ROOT environment variable (set by Claude Code)
+ * or path patterns indicating plugin installation.
+ *
+ * Plugin installations are located at:
+ * - ~/.claude/plugins/marketplaces/<marketplace-name>/
+ * - ~/.config/claude-code/plugins/<plugin-name>/
+ *
+ * Development installations have scripts at:
+ * - <repo>/.speck/scripts/
+ */
+export function isPluginInstallation(): boolean {
+  // Check for CLAUDE_PLUGIN_ROOT environment variable first
+  if (process.env.CLAUDE_PLUGIN_ROOT) {
+    return true;
+  }
+
+  // Fallback to path-based detection
+  const scriptDir = import.meta.dir;
+  return scriptDir.includes("/.claude/plugins/") ||
+         scriptDir.includes("/.config/claude-code/plugins/");
+}
+
+/**
+ * Get plugin root directory (where scripts/templates/commands live)
+ *
+ * In plugin installations: Uses CLAUDE_PLUGIN_ROOT env var or path resolution
+ * In development: <repo-root>/
+ */
+export function getPluginRoot(): string {
+  // Use CLAUDE_PLUGIN_ROOT if available (preferred method)
+  if (process.env.CLAUDE_PLUGIN_ROOT) {
+    return process.env.CLAUDE_PLUGIN_ROOT;
+  }
+
+  const scriptDir = import.meta.dir;
+
+  if (isPluginInstallation()) {
+    // In plugin: scripts are in <plugin-root>/.speck/scripts/common/
+    // Navigate up from .speck/scripts/common to plugin root
+    return path.resolve(scriptDir, "../../..");
+  } else {
+    // In development: scripts are in .speck/scripts/common/
+    // Navigate up to repo root
+    return path.resolve(scriptDir, "../../..");
+  }
+}
+
+/**
+ * Get templates directory path (works in both dev and plugin contexts)
+ *
+ * Both use the same structure: <root>/.specify/templates/
+ */
+export function getTemplatesDir(): string {
+  const pluginRoot = getPluginRoot();
+  return path.join(pluginRoot, ".specify/templates");
+}
+
+/**
+ * Get scripts directory path (works in both dev and plugin contexts)
+ *
+ * Both use the same structure: <root>/.speck/scripts/
+ */
+export function getScriptsDir(): string {
+  const pluginRoot = getPluginRoot();
+  return path.join(pluginRoot, ".speck/scripts");
+}
+
+/**
+ * Get memory directory path (works in both dev and plugin contexts)
+ *
+ * Both use the same structure: <root>/.specify/memory/
+ */
+export function getMemoryDir(): string {
+  const pluginRoot = getPluginRoot();
+  return path.join(pluginRoot, ".specify/memory");
+}
+
+/**
  * Get repository root directory
  *
  * Attempts to use git first, falls back to script location for non-git repos.

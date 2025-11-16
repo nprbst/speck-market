@@ -30,6 +30,7 @@ import { existsSync, mkdirSync, readdirSync, copyFileSync } from "node:fs";
 import path from "node:path";
 import { $ } from "bun";
 import { ExitCode } from "./contracts/cli-interface";
+import { getTemplatesDir } from "./common/paths";
 
 /**
  * CLI options for create-new-feature
@@ -409,7 +410,7 @@ async function main(args: string[]): Promise<number> {
   mkdirSync(featureDir, { recursive: true });
 
   // Copy template if it exists
-  const template = path.join(repoRoot, ".specify/templates/spec-template.md");
+  const template = path.join(getTemplatesDir(), "spec-template.md");
   const specFile = path.join(featureDir, "spec.md");
   if (existsSync(template)) {
     copyFileSync(template, specFile);
