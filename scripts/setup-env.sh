@@ -2,7 +2,13 @@
 # Speck Plugin Environment Setup Hook
 # Runs on SessionStart to configure SPECK_PLUGIN_ROOT environment variable
 
-# Diagnostic logging to stderr
+# Log file for troubleshooting
+LOG_FILE="$HOME/.claude/speck-setup-env.log"
+
+# Ensure log directory exists
+mkdir -p "$HOME/.claude"
+
+# Write diagnostic information to log file
 {
   echo "=== SPECK SETUP-ENV.SH DIAGNOSTIC ==="
   echo "Timestamp: $(date)"
@@ -11,30 +17,43 @@
   echo "  - CLAUDE_PLUGIN_ROOT: ${CLAUDE_PLUGIN_ROOT:-NOT SET}"
   echo "  - PWD: ${PWD}"
   echo "  - Script location: $0"
-} >&2
+  echo ""
 
-# Check if CLAUDE_ENV_FILE is set (Claude Code provides this)
-if [ -n "$CLAUDE_ENV_FILE" ]; then
-  echo "  - CLAUDE_ENV_FILE is set" >&2
+  # Check if CLAUDE_ENV_FILE is set (Claude Code provides this)
+  if [ -n "$CLAUDE_ENV_FILE" ]; then
+    echo "✓ CLAUDE_ENV_FILE is set"
+    echo "  Location: $CLAUDE_ENV_FILE"
+    echo "  File exists before write: $([ -f "$CLAUDE_ENV_FILE" ] && echo 'YES' || echo 'NO')"
+    echo ""
 
-  # Check if CLAUDE_PLUGIN_ROOT is set (indicates running from installed plugin)
-  if [ -n "$CLAUDE_PLUGIN_ROOT" ]; then
-    echo "  - CLAUDE_PLUGIN_ROOT is set" >&2
-    echo "  - Writing to: $CLAUDE_ENV_FILE" >&2
+    # Check if CLAUDE_PLUGIN_ROOT is set (indicates running from installed plugin)
+    if [ -n "$CLAUDE_PLUGIN_ROOT" ]; then
+      echo "✓ CLAUDE_PLUGIN_ROOT is set"
+      echo "  Value: $CLAUDE_PLUGIN_ROOT"
+      echo ""
+      echo "Writing SPECK_PLUGIN_ROOT to env file..."
 
-    # Set SPECK_PLUGIN_ROOT to point to .speck directory within plugin
-    echo "export SPECK_PLUGIN_ROOT=\"${CLAUDE_PLUGIN_ROOT}/.speck\"" >> "$CLAUDE_ENV_FILE"
+      # Set SPECK_PLUGIN_ROOT to point to .speck directory within plugin
+      echo "export SPECK_PLUGIN_ROOT=\"${CLAUDE_PLUGIN_ROOT}/.speck\"" >> "$CLAUDE_ENV_FILE"
 
-    echo "  - Successfully wrote SPECK_PLUGIN_ROOT" >&2
-    echo "  - Value: ${CLAUDE_PLUGIN_ROOT}/.speck" >&2
+      echo "✓ Successfully wrote SPECK_PLUGIN_ROOT"
+      echo "  Value: ${CLAUDE_PLUGIN_ROOT}/.speck"
+      echo ""
+      echo "Env file contents after write:"
+      cat "$CLAUDE_ENV_FILE" 2>&1
+    else
+      echo "✗ WARNING: CLAUDE_PLUGIN_ROOT not set"
+      echo "  Hook is running but plugin context unavailable"
+    fi
   else
-    echo "  - WARNING: CLAUDE_PLUGIN_ROOT not set" >&2
+    echo "✗ ERROR: CLAUDE_ENV_FILE not set"
+    echo "  SessionStart hook may not have access to this variable"
   fi
-  echo "=== END DIAGNOSTIC ===" >&2
-  exit 0
-fi
 
-# If CLAUDE_ENV_FILE is not set, nothing to do
-echo "  - ERROR: CLAUDE_ENV_FILE not set" >&2
-echo "=== END DIAGNOSTIC ===" >&2
+  echo ""
+  echo "=== END DIAGNOSTIC ==="
+  echo ""
+} >> "$LOG_FILE" 2>&1
+
+# Exit successfully (hook should not fail even if env vars not set)
 exit 0
