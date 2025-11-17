@@ -1,0 +1,5 @@
+{
+  "SessionStart": {
+    "command": "bash scripts/setup-env.sh"
+  }
+}

@@ -19,9 +19,20 @@ $ARGUMENTS
 
 You **MUST** consider the user input before proceeding (if not empty).
 
+## Script Path Resolution
+
+**IMPORTANT**: Detect execution context before running any scripts:
+
+1. Check if `CLAUDE_PLUGIN_ROOT` environment variable is set (run `echo $CLAUDE_PLUGIN_ROOT`)
+2. Set paths based on context:
+   - **Plugin context** (if CLAUDE_PLUGIN_ROOT is set): Use `$CLAUDE_PLUGIN_ROOT/.speck/scripts/` for scripts
+   - **Standalone context** (if CLAUDE_PLUGIN_ROOT is empty): Use `.speck/scripts/` for scripts
+
+Throughout this command, when you see `.speck/scripts/scriptname.ts`, replace it with the resolved path from above.
+
 ## Outline
 
-1. **Setup**: Run `.speck/scripts/check-prerequisites.ts --json` from repo root and parse FEATURE_DIR and AVAILABLE_DOCS list. All paths must be absolute. For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\''m Groot' (or double-quote if possible: "I'm Groot").
+1. **Setup**: Run `bun run ${SPECK_PLUGIN_ROOT:-".speck"}/scripts/check-prerequisites.ts --json` from repo root and parse FEATURE_DIR and AVAILABLE_DOCS list. All paths must be absolute. For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\''m Groot' (or double-quote if possible: "I'm Groot").
 
 2. **Load design documents**: Read from FEATURE_DIR:
    - **Required**: plan.md (tech stack, libraries, structure), spec.md (user stories with priorities)
@@ -39,7 +50,7 @@ You **MUST** consider the user input before proceeding (if not empty).
    - Create parallel execution examples per user story
    - Validate task completeness (each user story has all needed tasks, independently testable)
 
-4. **Generate tasks.md**: Use `.speck/templates/tasks-template.md` as structure, fill with:
+4. **Generate tasks.md**: Use `${SPECK_PLUGIN_ROOT:-".specify"}/templates/tasks-template.md` as structure, fill with:
    - Correct feature name from plan.md
    - Phase 1: Setup tasks (project initialization)
    - Phase 2: Foundational tasks (blocking prerequisites for all user stories)

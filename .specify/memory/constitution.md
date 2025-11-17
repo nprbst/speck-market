@@ -1,11 +1,9 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version Change: 1.0.0 → 1.1.0
-Modified Principles: None
-Added Sections:
-  - VII. File Format Compatibility (new principle)
-
+Version Change: 1.1.0 → 1.1.1
+Modified Principles: V (Claude Code Native) - added plugin bundling exception
+Added Sections: None
 Removed Sections: None
 
 Templates Requiring Updates:
@@ -16,11 +14,10 @@ Templates Requiring Updates:
 
 Follow-up TODOs: None
 
-Rationale for 1.1.0 (MINOR bump):
-  - Added new principle VII: File Format Compatibility
-  - Ensures Speck maintains full compatibility with spec-kit's specs/ directory structure
-  - Enables drop-in replacement and fallback scenarios without data loss
-  - Material guidance expansion requiring version bump
+Rationale for 1.1.1 (PATCH bump):
+  - Clarification to Principle V allowing plugin bundling skills
+  - Does not change core principle, only clarifies application scope
+  - No breaking changes to governance
 -->
 
 # Speck Constitution
@@ -115,6 +112,7 @@ proposition.
 - Agents MUST be used for long-running, iterative processes (clarification,
   transformation)
 - Skills MUST extract reusable patterns (template rendering, validation)
+- Exception: Skills MAY serve as execution delegates in plugin contexts where direct script execution is unavailable (e.g., speck-runner skill bundles scripts for Claude Plugin distribution)
 - TypeScript CLI MUST provide identical functionality for non-Claude Code users
   (parity requirement: <1% behavioral deviation per SC-005)
 
@@ -272,4 +270,4 @@ for existing artifacts.
 - MINOR: New principles, sections, or material guidance expansions
 - PATCH: Clarifications, wording improvements, typo fixes
 
-**Version**: 1.1.0 | **Ratified**: 2025-11-14 | **Last Amended**: 2025-11-14
+**Version**: 1.1.1 | **Ratified**: 2025-11-14 | **Last Amended**: 2025-11-16
