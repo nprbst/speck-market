@@ -65,9 +65,9 @@ Given that feature description, do this:
       - Find the highest number N
       - Use N+1 for the new branch number
 
-   d. Run the script `bun run ${SPECK_PLUGIN_ROOT:-".speck"}/scripts/create-new-feature.ts --json "$ARGUMENTS"` with the calculated number and short-name:
+   d. Run the script `bun run $(cat .speck/plugin-path 2>/dev/null || echo ".speck")/scripts/create-new-feature.ts --json "$ARGUMENTS"` with the calculated number and short-name:
       - Pass `--number N+1` and `--short-name "your-short-name"` along with the feature description
-      - Bash example: `bun run ${SPECK_PLUGIN_ROOT:-".speck"}/scripts/create-new-feature.ts --json "$ARGUMENTS" --json --number 5 --short-name "user-auth" "Add user authentication"`
+      - Bash example: `bun run $(cat .speck/plugin-path 2>/dev/null || echo ".speck")/scripts/create-new-feature.ts --json "$ARGUMENTS" --json --number 5 --short-name "user-auth" "Add user authentication"`
 
    **IMPORTANT**:
    - Check all three sources (remote branches, local branches, specs directories) to find the highest number
@@ -78,7 +78,7 @@ Given that feature description, do this:
    - The JSON output will contain BRANCH_NAME and SPEC_FILE paths
    - For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\''m Groot' (or double-quote if possible: "I'm Groot")
 
-3. Load `${SPECK_PLUGIN_ROOT:-".specify"}/templates/spec-template.md` to understand required sections.
+3. Load `$(cat .speck/plugin-path 2>/dev/null || echo ".specify")/templates/spec-template.md` to understand required sections.
 
 4. Follow this execution flow:
 

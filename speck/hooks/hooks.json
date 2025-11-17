@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/setup-env.sh"
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/setup-env.sh"
           }
         ]
       }
