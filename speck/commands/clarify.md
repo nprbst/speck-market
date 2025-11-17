@@ -14,6 +14,16 @@ $ARGUMENTS
 
 You **MUST** consider the user input before proceeding (if not empty).
 
+## Plugin Path Setup
+
+Before proceeding, determine the plugin root path by running:
+
+```bash
+cat "$HOME/.claude/speck-plugin-path" 2>/dev/null || echo ".speck"
+```
+
+Store this value and use `$PLUGIN_ROOT` in all subsequent script paths (e.g., `bun run $PLUGIN_ROOT/scripts/...`).
+
 ## Outline
 
 Goal: Detect and reduce ambiguity or missing decision points in the active feature specification and record the clarifications directly in the spec file.
@@ -22,7 +32,7 @@ Note: This clarification workflow is expected to run (and be completed) BEFORE i
 
 Execution steps:
 
-1. Run `bun run $(cat .speck/plugin-path 2>/dev/null || echo ".speck")/scripts/check-prerequisites.ts --json --paths-only` from repo root **once** (combined `--json --paths-only` mode / `-Json -PathsOnly`). Parse minimal JSON payload fields:
+1. Run `bun run $PLUGIN_ROOT/scripts/check-prerequisites.ts --json --paths-only` from repo root **once** (combined `--json --paths-only` mode / `-Json -PathsOnly`). Parse minimal JSON payload fields:
    - `FEATURE_DIR`
    - `FEATURE_SPEC`
    - (Optionally capture `IMPL_PLAN`, `TASKS` for future chained flows.)

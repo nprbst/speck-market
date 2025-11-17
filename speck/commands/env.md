@@ -23,11 +23,11 @@ echo "SPECK_PLUGIN_ROOT: ${SPECK_PLUGIN_ROOT:-NOT SET}"
 echo ""
 ```
 
-### 2. Check Plugin Path File (Workaround for CLAUDE_ENV_FILE limitation)
+### 2. Check Plugin Path File
 
 ```bash
 echo "=== Plugin Path File ==="
-PLUGIN_PATH_FILE=".speck/plugin-path"
+PLUGIN_PATH_FILE="$HOME/.claude/speck-plugin-path"
 if [ -f "$PLUGIN_PATH_FILE" ]; then
   echo "✓ File exists: $PLUGIN_PATH_FILE"
   echo "Contents:"
@@ -63,9 +63,9 @@ echo "=== Effective Plugin Root ==="
 if [ -n "$SPECK_PLUGIN_ROOT" ]; then
   EFFECTIVE_ROOT="$SPECK_PLUGIN_ROOT"
   echo "✓ Using SPECK_PLUGIN_ROOT environment variable"
-elif [ -f ".speck/plugin-path" ]; then
-  EFFECTIVE_ROOT=$(cat .speck/plugin-path)
-  echo "✓ Loaded from .speck/plugin-path"
+elif [ -f "$HOME/.claude/speck-plugin-path" ]; then
+  EFFECTIVE_ROOT=$(cat "$HOME/.claude/speck-plugin-path")
+  echo "✓ Loaded from $HOME/.claude/speck-plugin-path"
 elif [ -n "$CLAUDE_PLUGIN_ROOT" ]; then
   EFFECTIVE_ROOT="${CLAUDE_PLUGIN_ROOT}"
   echo "✓ Derived from CLAUDE_PLUGIN_ROOT"

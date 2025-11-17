@@ -11,9 +11,19 @@ $ARGUMENTS
 
 You **MUST** consider the user input before proceeding (if not empty).
 
+## Plugin Path Setup
+
+Before proceeding, determine the plugin root path by running:
+
+```bash
+cat "$HOME/.claude/speck-plugin-path" 2>/dev/null || echo ".speck"
+```
+
+Store this value and use `$PLUGIN_ROOT` in all subsequent script paths (e.g., `bun run $PLUGIN_ROOT/scripts/...`).
+
 ## Outline
 
-1. Run `bun run $(cat .speck/plugin-path 2>/dev/null || echo ".speck")/scripts/check-prerequisites.ts --json --require-tasks --include-tasks` from repo root and parse FEATURE_DIR and AVAILABLE_DOCS list. All paths must be absolute. For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\''m Groot' (or double-quote if possible: "I'm Groot").
+1. Run `bun run $PLUGIN_ROOT/scripts/check-prerequisites.ts --json --require-tasks --include-tasks` from repo root and parse FEATURE_DIR and AVAILABLE_DOCS list. All paths must be absolute. For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\''m Groot' (or double-quote if possible: "I'm Groot").
 1. From the executed script, extract the path to **tasks**.
 1. Get the Git remote by running:
 

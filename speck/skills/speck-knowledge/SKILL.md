@@ -27,6 +27,18 @@ description: |
 
 ---
 
+## Plugin Path Setup
+
+Before accessing templates or other plugin resources, determine the plugin root path by running:
+
+```bash
+cat "$HOME/.claude/speck-plugin-path" 2>/dev/null || echo ".speck"
+```
+
+Store this value and use `$PLUGIN_ROOT` in all subsequent file paths (e.g., `$PLUGIN_ROOT/templates/...`).
+
+---
+
 ## Core Capabilities
 
 ### 1. Feature Discovery
@@ -74,12 +86,12 @@ When a feature cannot be found:
 
 ### 2. Template References
 
-Speck uses templates in `.specify/templates/` to define expected structure for artifacts:
+Speck uses templates in `$PLUGIN_ROOT/templates/` to define expected structure for artifacts:
 
 **Template Locations**:
-- Spec template: `.specify/templates/spec-template.md`
-- Plan template: `.specify/templates/plan-template.md`
-- Tasks template: `.specify/templates/tasks-template.md`
+- Spec template: `$PLUGIN_ROOT/templates/spec-template.md`
+- Plan template: `$PLUGIN_ROOT/templates/plan-template.md`
+- Tasks template: `$PLUGIN_ROOT/templates/tasks-template.md`
 
 **When to Reference Templates**:
 - User asks "What should go in [section]?" → Extract HTML comments from template for that section
@@ -138,7 +150,7 @@ Templates include HTML comments with three types:
 
 **Extracting Section Purposes**:
 When user asks "What goes in Requirements?":
-1. Load relevant template (.specify/templates/spec-template.md)
+1. Load relevant template ($PLUGIN_ROOT/templates/spec-template.md)
 2. Find the Requirements section
 3. Extract HTML comment immediately following the header
 4. Parse first line as section purpose
@@ -393,7 +405,7 @@ When user asks "What's in scope?" or "What's out of scope?":
 
 #### Constitution Check
 - Section header: `## Constitution Check`
-- References constitutional principles from `.specify/memory/constitution.md`
+- References constitutional principles from `$PLUGIN_ROOT/memory/constitution.md`
 - Format per principle:
   ```
   ### Principle N: [Name]
@@ -521,7 +533,7 @@ When user asks to compare files against templates (e.g., "Does my spec follow th
 
 ### Step 1: Load Both Files
 1. Identify file type from user query (spec/plan/tasks)
-2. Load template: `.specify/templates/{type}-template.md`
+2. Load template: `$PLUGIN_ROOT/templates/{type}-template.md`
 3. Load actual file: `specs/NNN-feature/{type}.md`
 
 ### Step 2: Extract Sections
@@ -778,7 +790,7 @@ Response:
 User: Does my spec for feature 005 follow the template?
 
 Skill Actions:
-1. Load .specify/templates/spec-template.md
+1. Load $PLUGIN_ROOT/templates/spec-template.md
 2. Load specs/005-speck-skill/spec.md
 3. Extract sections from both
 4. Compare mandatory sections
@@ -825,7 +837,7 @@ User: What should go in the Success Criteria section?
 
 Skill Actions:
 1. Detect question about section purpose
-2. Load .specify/templates/spec-template.md
+2. Load $PLUGIN_ROOT/templates/spec-template.md
 3. Find "Success Criteria" section
 4. Extract HTML comment
 5. Parse guidelines
