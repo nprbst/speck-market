@@ -140,9 +140,9 @@ Every artifact file (spec.md, plan.md, tasks.md) can be in one of five states:
 - **Detection**: File does not exist at expected path
 - **Severity**: ERROR
 - **Recovery Guidance**:
-  - spec.md missing → "Run `/speck.specify 'Feature description'` to create spec"
-  - plan.md missing → "Run `/speck.plan` to generate plan"
-  - tasks.md missing → "Run `/speck.tasks` to generate tasks"
+  - spec.md missing → "Run `/speck:specify 'Feature description'` to create spec"
+  - plan.md missing → "Run `/speck:plan` to generate plan"
+  - tasks.md missing → "Run `/speck:tasks` to generate tasks"
 
 #### State 2: EMPTY
 - **Detection**: File exists but has no content (size 0 bytes or only whitespace)
@@ -153,16 +153,16 @@ Every artifact file (spec.md, plan.md, tasks.md) can be in one of five states:
 - **Detection**: File has content but cannot be parsed (invalid markdown, corrupted structure)
 - **Severity**: WARNING
 - **Behavior**: Extract whatever partial information is available
-- **Recovery Guidance**: "File structure is invalid. Manually fix markdown or regenerate with appropriate `/speck.*` command"
+- **Recovery Guidance**: "File structure is invalid. Manually fix markdown or regenerate with appropriate `/speck:*` command"
 
 #### State 4: INCOMPLETE
 - **Detection**: Valid structure but missing mandatory sections
 - **Severity**: WARNING
 - **Behavior**: Parse available sections, warn about missing mandatory sections
 - **Recovery Guidance**:
-  - spec.md incomplete → "Run `/speck.clarify` to add missing sections"
-  - plan.md incomplete → "Run `/speck.clarify` for missing research, or continue filling manually"
-  - tasks.md incomplete → "Complete tasks or regenerate with `/speck.tasks`"
+  - spec.md incomplete → "Run `/speck:clarify` to add missing sections"
+  - plan.md incomplete → "Run `/speck:clarify` for missing research, or continue filling manually"
+  - tasks.md incomplete → "Complete tasks or regenerate with `/speck:tasks`"
 - **Report**: List missing mandatory sections, calculate completeness percentage
 
 #### State 5: VALID
@@ -218,7 +218,7 @@ ERROR: Spec Not Found
 ┌──────────────────────────────────────────────────┐
 │ spec.md not found at specs/006-feature/          │
 ├──────────────────────────────────────────────────┤
-│ Recovery: Run /speck.specify "Feature desc"      │
+│ Recovery: Run /speck:specify "Feature desc"      │
 └──────────────────────────────────────────────────┘
 ```
 
@@ -232,7 +232,7 @@ WARNING: Incomplete Specification
 │ - Success Criteria (mandatory)                   │
 │ - User Scenarios & Testing (mandatory)           │
 ├──────────────────────────────────────────────────┤
-│ Recovery: Run /speck.clarify to fill sections    │
+│ Recovery: Run /speck:clarify to fill sections    │
 └──────────────────────────────────────────────────┘
 
 Found: 5 functional requirements, 2 key entities
@@ -316,17 +316,17 @@ Located immediately after H1, typically:
   - Technology-agnostic (no implementation details)
 
 **Optional Sections**:
-- `## Clarifications`: Q&A from `/speck.clarify` sessions
+- `## Clarifications`: Q&A from `/speck:clarify` sessions
 - `## Assumptions`: Project assumptions
 - `## Edge Cases`: Already mentioned in User Scenarios
 
 **[NEEDS CLARIFICATION] Markers**:
 - Pattern: `[NEEDS CLARIFICATION]` or `[NEEDS CLARIFICATION: specific question]`
 - Indicates unresolved questions in spec
-- Guidance: "Run `/speck.clarify` to resolve clarifications before planning"
+- Guidance: "Run `/speck:clarify` to resolve clarifications before planning"
 
 **Handling Missing/Incomplete spec.md**:
-- **MISSING**: "Spec not found. Run `/speck.specify 'Feature description'`"
+- **MISSING**: "Spec not found. Run `/speck:specify 'Feature description'`"
 - **EMPTY**: Same as MISSING
 - **MALFORMED**: Extract partial sections, warn about structure issues
 - **INCOMPLETE**: List missing mandatory sections with completeness percentage
@@ -335,7 +335,7 @@ Located immediately after H1, typically:
 If spec.md has Requirements but missing Success Criteria:
 - Return available FR-XXX items
 - Warn: "Missing Success Criteria (mandatory) - 66% complete"
-- Suggest: "Run `/speck.clarify` to add Success Criteria"
+- Suggest: "Run `/speck:clarify` to add Success Criteria"
 
 ---
 
@@ -417,10 +417,10 @@ Extract principle references:
 - Justification text
 
 **Handling Missing/Incomplete plan.md**:
-- **MISSING**: "Plan not found. Run `/speck.plan` to generate implementation plan"
+- **MISSING**: "Plan not found. Run `/speck:plan` to generate implementation plan"
 - **INCOMPLETE**: Detect missing phases or [NEEDS CLARIFICATION] markers
-  - If Phase 0 incomplete: "Run `/speck.clarify` to resolve research unknowns"
-  - If Phase 1 incomplete: "Continue filling design artifacts or run `/speck.clarify`"
+  - If Phase 0 incomplete: "Run `/speck:clarify` to resolve research unknowns"
+  - If Phase 1 incomplete: "Continue filling design artifacts or run `/speck:clarify`"
 
 ---
 
@@ -496,7 +496,7 @@ User: "How many tasks are completed?"
 - Calculate percentage: completed / total
 
 **Handling Missing/Incomplete tasks.md**:
-- **MISSING**: "Tasks not found. Run `/speck.tasks` to generate task breakdown"
+- **MISSING**: "Tasks not found. Run `/speck:tasks` to generate task breakdown"
 - **INCOMPLETE**: Count pending vs completed tasks, identify current phase
 
 ---
@@ -801,7 +801,7 @@ Response:
   ┌────────────────────────────────────────────────────┐
   │ tasks.md not found at specs/003-user-auth/         │
   ├────────────────────────────────────────────────────┤
-  │ Recovery: Run /speck.tasks to generate tasks       │
+  │ Recovery: Run /speck:tasks to generate tasks       │
   └────────────────────────────────────────────────────┘
 ```
 
@@ -837,12 +837,12 @@ Response:
 
 **Read-Only Operations**:
 This skill NEVER modifies files. For creating or updating Speck artifacts:
-- Creating specs: `/speck.specify "Feature description"`
-- Clarifying specs: `/speck.clarify`
-- Generating plans: `/speck.plan`
-- Generating tasks: `/speck.tasks`
-- Creating checklists: `/speck.checklist`
-- Analyzing consistency: `/speck.analyze`
+- Creating specs: `/speck:specify "Feature description"`
+- Clarifying specs: `/speck:clarify`
+- Generating plans: `/speck:plan`
+- Generating tasks: `/speck:tasks`
+- Creating checklists: `/speck:checklist`
+- Analyzing consistency: `/speck:analyze`
 
 **Non-Destructive Constraint**:
 Per FR-012 and specification assumptions, the skill:
@@ -885,6 +885,32 @@ If skill doesn't activate when expected:
 2. **Use Speck terminology**: spec, plan, tasks, requirements, user stories
 3. **Be specific about file types**: Mention spec.md, plan.md, or tasks.md
 4. **Establish context first**: "Tell me about feature 005" then ask follow-ups
+
+---
+
+## Slash Command Reference
+
+This skill is for **reading and understanding** existing Speck artifacts. When users need to **create or modify** files, guide them to these slash commands:
+
+| Command | Purpose | Example Trigger Phrase |
+|---------|---------|------------------------|
+| `/speck:specify` | Create or update feature specification | "Run /speck:specify to create a new spec" |
+| `/speck:clarify` | Resolve ambiguities and add missing sections | "Run /speck:clarify to resolve [NEEDS CLARIFICATION] markers" |
+| `/speck:plan` | Generate implementation plan from spec | "Run /speck:plan to create the implementation plan" |
+| `/speck:tasks` | Generate actionable task breakdown | "Run /speck:tasks to create a task list" |
+| `/speck:analyze` | Check cross-artifact consistency and quality | "Run /speck:analyze to validate spec/plan/tasks consistency" |
+| `/speck:implement` | Execute tasks from tasks.md | "Run /speck:implement to start implementation" |
+
+**When to Suggest Commands**:
+- **Missing spec.md** → Suggest `/speck:specify "Feature description"`
+- **[NEEDS CLARIFICATION] markers** → Suggest `/speck:clarify`
+- **Missing plan.md** → Suggest `/speck:plan`
+- **Missing tasks.md** → Suggest `/speck:tasks`
+- **Incomplete sections or new requirements** → Suggest `/speck:clarify` or manual editing
+- **After clarification** → Suggest `/speck:analyze` to check consistency
+- **After task generation** → Suggest `/speck:implement` to execute tasks
+
+**For complete command list**: Direct users to type `/help` in Claude Code.
 
 ---
 
