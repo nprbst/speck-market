@@ -1,5 +1,15 @@
 {
-  "SessionStart": {
-    "command": "bash scripts/setup-env.sh"
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/scripts/setup-env.sh"
+          }
+        ]
+      }
+    ]
   }
 }
