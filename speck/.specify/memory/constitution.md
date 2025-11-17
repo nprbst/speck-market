@@ -1,8 +1,8 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version Change: 1.1.0 → 1.1.1
-Modified Principles: V (Claude Code Native) - added plugin bundling exception
+Version Change: 1.1.1 → 1.1.2
+Modified Principles: V (Claude Code Native) - updated exception from bundled skills to SessionStart hooks pattern
 Added Sections: None
 Removed Sections: None
 
@@ -112,7 +112,7 @@ proposition.
 - Agents MUST be used for long-running, iterative processes (clarification,
   transformation)
 - Skills MUST extract reusable patterns (template rendering, validation)
-- Exception: Skills MAY serve as execution delegates in plugin contexts where direct script execution is unavailable (e.g., speck-runner skill bundles scripts for Claude Plugin distribution)
+- Exception: SessionStart hooks MAY establish runtime environment configuration (e.g., script path resolution) when plugin context requires session-persistent state not achievable through individual command execution
 - TypeScript CLI MUST provide identical functionality for non-Claude Code users
   (parity requirement: <1% behavioral deviation per SC-005)
 
@@ -270,4 +270,4 @@ for existing artifacts.
 - MINOR: New principles, sections, or material guidance expansions
 - PATCH: Clarifications, wording improvements, typo fixes
 
-**Version**: 1.1.1 | **Ratified**: 2025-11-14 | **Last Amended**: 2025-11-16
+**Version**: 1.1.2 | **Ratified**: 2025-11-14 | **Last Amended**: 2025-11-16
