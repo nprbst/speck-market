@@ -1,6 +1,20 @@
 ---
-name: speck-workflow
-description: Interpret Speck spec, plan, and tasks files. Answer questions about requirements, architecture, and progress without running slash commands.
+name: speck-knowledge
+description: |
+  Answer questions about Speck workflow, phases, commands, and artifacts (spec.md, plan.md, tasks.md). Covers workflow stages, file interpretation, requirements, architecture, task progress, and methodology.
+  
+  WHEN to auto-invoke:
+  - Speck workflow/phases/methodology questions
+  - Speck slash command questions (/speck:*)
+  - Artifact interpretation (spec/plan/tasks files)
+  - Feature requirements, user stories, architecture
+  - Task status and progress tracking
+  - Template comparison
+  
+  NOT WHEN:
+  - Creating/modifying files (guide to /speck:* commands)
+  - General coding/debugging unrelated to Speck
+  - Non-Speck documentation
 ---
 
 # Speck Workflow Skill
