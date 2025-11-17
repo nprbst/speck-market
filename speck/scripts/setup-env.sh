@@ -33,11 +33,12 @@ mkdir -p "$HOME/.claude"
       echo ""
       echo "Writing SPECK_PLUGIN_ROOT to env file..."
 
-      # Set SPECK_PLUGIN_ROOT to point to .speck directory within plugin
-      echo "export SPECK_PLUGIN_ROOT=\"${CLAUDE_PLUGIN_ROOT}/.speck\"" >> "$CLAUDE_ENV_FILE"
+      # Set SPECK_PLUGIN_ROOT to plugin root (which contains .speck/)
+      # Note: CLAUDE_PLUGIN_ROOT points to dist/plugin/speck/ which contains .speck/
+      echo "export SPECK_PLUGIN_ROOT=\"${CLAUDE_PLUGIN_ROOT}\"" >> "$CLAUDE_ENV_FILE"
 
       echo "✓ Successfully wrote SPECK_PLUGIN_ROOT via CLAUDE_ENV_FILE"
-      echo "  Value: ${CLAUDE_PLUGIN_ROOT}/.speck"
+      echo "  Value: ${CLAUDE_PLUGIN_ROOT}"
       echo ""
       echo "Env file contents after write:"
       cat "$CLAUDE_ENV_FILE" 2>&1
@@ -45,15 +46,20 @@ mkdir -p "$HOME/.claude"
       echo "⚠ CLAUDE_ENV_FILE not available in plugin SessionStart hook"
       echo "  This is a known limitation - env vars cannot be persisted from plugin hooks"
       echo ""
-      echo "SOLUTION: Using SPECK_PLUGIN_ROOT_FILE instead"
+      echo "SOLUTION: Writing plugin path to .speck/plugin-path in project root"
 
-      # Write the plugin root path to a file that commands can source
-      SPECK_ROOT_FILE="$HOME/.claude/speck-plugin-root"
-      echo "export SPECK_PLUGIN_ROOT=\"${CLAUDE_PLUGIN_ROOT}/.speck\"" > "$SPECK_ROOT_FILE"
+      # Create .speck directory if it doesn't exist
+      mkdir -p .speck
 
-      echo "✓ Wrote SPECK_PLUGIN_ROOT to: $SPECK_ROOT_FILE"
-      echo "  Value: ${CLAUDE_PLUGIN_ROOT}/.speck"
-      echo "  Commands can source this file to get the path"
+      # Write the plugin root path to .speck/plugin-path
+      # PWD is the project root, same for both hook and commands
+      # Note: CLAUDE_PLUGIN_ROOT points to the speck/ subdirectory which contains .speck/
+      echo "${CLAUDE_PLUGIN_ROOT}" > .speck/plugin-path
+
+      echo "✓ Wrote plugin path to: .speck/plugin-path"
+      echo "  PWD: ${PWD}"
+      echo "  Plugin root: ${CLAUDE_PLUGIN_ROOT}"
+      echo "  Commands can read with: \$(cat .speck/plugin-path 2>/dev/null || echo \".speck\")"
     fi
   else
     echo "✗ WARNING: CLAUDE_PLUGIN_ROOT not set"
