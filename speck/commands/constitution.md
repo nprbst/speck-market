@@ -14,14 +14,26 @@ $ARGUMENTS
 
 You **MUST** consider the user input before proceeding (if not empty).
 
+## Plugin Path Setup
+
+Before proceeding, determine the plugin root path by running:
+
+```bash
+cat "$HOME/.claude/speck-plugin-path" 2>/dev/null || echo ".speck"
+```
+
+Store this value and use `$PLUGIN_ROOT` in all subsequent paths (e.g., `$PLUGIN_ROOT/memory/constitution.md`).
+
 ## Outline
 
-You are updating the project constitution at `.speck/memory/constitution.md`. This file is a TEMPLATE containing placeholder tokens in square brackets (e.g. `[PROJECT_NAME]`, `[PRINCIPLE_1_NAME]`). Your job is to (a) collect/derive concrete values, (b) fill the template precisely, and (c) propagate any amendments across dependent artifacts.
+You are updating the project-local constitution at `.speck/memory/constitution.md` (in the project root, NOT the plugin). If this file doesn't exist yet, copy it from the plugin template at `$PLUGIN_ROOT/memory/constitution.md` first. This file is a TEMPLATE containing placeholder tokens in square brackets (e.g. `[PROJECT_NAME]`, `[PRINCIPLE_1_NAME]`). Your job is to (a) collect/derive concrete values, (b) fill the template precisely, and (c) propagate any amendments across dependent artifacts.
 
 Follow this execution flow:
 
-1. Load the existing constitution template at `.speck/memory/constitution.md`.
-   - Identify every placeholder token of the form `[ALL_CAPS_IDENTIFIER]`.
+1. Check if `.speck/memory/constitution.md` exists in the project root:
+   - If it exists: Load it as the working copy
+   - If it doesn't exist: Copy from `$PLUGIN_ROOT/memory/constitution.md` to `.speck/memory/constitution.md` first, then load it
+   - Identify every placeholder token of the form `[ALL_CAPS_IDENTIFIER]`
    **IMPORTANT**: The user might require less or more principles than the ones used in the template. If a number is specified, respect that - follow the general template. You will update the doc accordingly.
 
 2. Collect/derive values for placeholders:
@@ -41,9 +53,9 @@ Follow this execution flow:
    - Ensure Governance section lists amendment procedure, versioning policy, and compliance review expectations.
 
 4. Consistency propagation checklist (convert prior checklist into active validations):
-   - Read `.speck/templates/plan-template.md` and ensure any "Constitution Check" or rules align with updated principles.
-   - Read `.speck/templates/spec-template.md` for scope/requirements alignment—update if constitution adds/removes mandatory sections or constraints.
-   - Read `.speck/templates/tasks-template.md` and ensure task categorization reflects new or removed principle-driven task types (e.g., observability, versioning, testing discipline).
+   - Read `$PLUGIN_ROOT/templates/plan-template.md` and ensure any "Constitution Check" or rules align with updated principles.
+   - Read `$PLUGIN_ROOT/templates/spec-template.md` for scope/requirements alignment—update if constitution adds/removes mandatory sections or constraints.
+   - Read `$PLUGIN_ROOT/templates/tasks-template.md` and ensure task categorization reflects new or removed principle-driven task types (e.g., observability, versioning, testing discipline).
    - Read each command file in `.claude/commands/speck:*.md` to verify no outdated references remain when generic guidance is required.
    - Read any runtime guidance docs (e.g., `README.md`, `docs/quickstart.md`, or agent-specific guidance files if present). Update references to principles changed.
 
