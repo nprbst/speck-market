@@ -90,11 +90,16 @@ export function getPluginRoot(): string {
 /**
  * Get templates directory path (works in both dev and plugin contexts)
  *
- * Both use the same structure: <root>/.speck/templates/
+ * Plugin installations: <plugin-root>/templates/
+ * Development: <repo-root>/.speck/templates/
  */
 export function getTemplatesDir(): string {
   const pluginRoot = getPluginRoot();
-  return path.join(pluginRoot, ".speck/templates");
+  if (isPluginInstallation()) {
+    return path.join(pluginRoot, "templates");
+  } else {
+    return path.join(pluginRoot, ".speck/templates");
+  }
 }
 
 /**
@@ -110,11 +115,16 @@ export function getScriptsDir(): string {
 /**
  * Get memory directory path (works in both dev and plugin contexts)
  *
- * Both use the same structure: <root>/.speck/memory/
+ * Plugin installations: <plugin-root>/memory/
+ * Development: <repo-root>/.speck/memory/
  */
 export function getMemoryDir(): string {
   const pluginRoot = getPluginRoot();
-  return path.join(pluginRoot, ".speck/memory");
+  if (isPluginInstallation()) {
+    return path.join(pluginRoot, "memory");
+  } else {
+    return path.join(pluginRoot, ".speck/memory");
+  }
 }
 
 /**
