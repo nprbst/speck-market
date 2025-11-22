@@ -96,7 +96,7 @@ This command supports the following flags for branch-aware task generation (US4)
    - Create parallel execution examples per user story
    - Validate task completeness (each user story has all needed tasks, independently testable)
 
-5. **Generate tasks.md** (T058): Use `$PLUGIN_ROOT/templates/tasks-template.md` as structure, fill with:
+5. **Generate tasks.md** (T058): Use `${CLAUDE_PLUGIN_ROOT}/templates/tasks-template.md` as structure, fill with:
    - **Output file path**:
      - If `--branch` flag provided: `FEATURE_DIR/tasks-<branch-name>.md`
      - If `--branch` flag NOT provided: `FEATURE_DIR/tasks.md` (default)
