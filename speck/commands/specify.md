@@ -43,17 +43,22 @@ Given that feature description, do this:
       git fetch --all --prune
       ```
 
-   b. Find the highest feature number across all sources for the short-name:
+   b. Find the highest feature number across ALL specs/branches:
+      - Remote branches: `git ls-remote --heads origin | grep -E 'refs/heads/[0-9]+-' | sed -E 's/.*refs\/heads\/([0-9]+)-.*/\1/' | sort -n | tail -1`
+      - Local branches: `git branch | grep -E '[0-9]+-' | sed -E 's/.*[ *]([0-9]+)-.*/\1/' | sort -n | tail -1`
+      - Specs directories: `ls -d specs/[0-9]*-* 2>/dev/null | sed -E 's/.*\/([0-9]+)-.*/\1/' | sort -n | tail -1`
+
+   c. Check if the specific short-name already exists:
       - Remote branches: `git ls-remote --heads origin | grep -E 'refs/heads/[0-9]+-<short-name>$'`
       - Local branches: `git branch | grep -E '^[* ]*[0-9]+-<short-name>$'`
       - Specs directories: Check for directories matching `specs/[0-9]+-<short-name>`
 
-   c. Determine the next available number:
-      - Extract all numbers from all three sources
-      - Find the highest number N
-      - Use N+1 for the new branch number
+   d. Determine the next available number:
+      - If the short-name already exists (step c), extract the highest number for that short-name and use N+1
+      - If the short-name doesn't exist (step c), use the highest number from ALL specs (step b) + 1
+      - If no specs exist at all, start with 001
 
-   d. **Detect multi-repo mode and prompt for spec location** (T063):
+   e. **Detect multi-repo mode and prompt for spec location** (T063):
       - Run: `speck-check-prerequisites --json --skip-feature-check`
       - Parse the JSON output and extract the `MODE` field
       - If `MODE` is `"multi-repo"`:
@@ -63,17 +68,18 @@ Given that feature description, do this:
       - If `MODE` is `"single-repo"`:
         - Set `SPEC_LOCATION = "local"` (no prompt needed)
 
-   e. Run the script `speck-create-new-feature --json "$ARGUMENTS"` with the calculated number and short-name:
+   f. Run the script `speck-create-new-feature --json "$ARGUMENTS"` with the calculated number and short-name:
       - Pass `--number N+1` and `--short-name "your-short-name"` along with the feature description
       - **If multi-repo mode and user chose "parent"**: Add `--shared-spec` flag
       - **If multi-repo mode and user chose "local"**: Add `--local-spec` flag (or omit flag - local is default)
       - Bash example: `speck-create-new-feature --json --number 5 --short-name "user-auth" --shared-spec "Add user authentication"`
 
    **IMPORTANT**:
-   - Check all three sources (remote branches, local branches, specs directories) to find the highest number
-   - Only match branches/directories with the exact short-name pattern
-   - If no existing branches/directories found with this short-name, start with number 1
-   - You must only ever run this script once per feature
+   - First find the highest number across ALL specs/branches to determine the baseline
+   - Then check if the specific short-name already exists
+   - If short-name exists, use its highest number + 1; otherwise use the overall highest + 1
+   - This ensures sequential numbering across all features while respecting existing short-name versions
+   - You must only ever run the create-new-feature script once per feature
    - The JSON is provided in the terminal as output - always refer to it to get the actual content you're looking for
    - The JSON output will contain BRANCH_NAME and SPEC_FILE paths
    - For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\''m Groot' (or double-quote if possible: "I'm Groot")
