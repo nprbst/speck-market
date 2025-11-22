@@ -183,10 +183,9 @@ export async function getRepoRoot(): Promise<string> {
     const result = await $`git rev-parse --show-toplevel`.quiet();
     return result.text().trim();
   } catch {
-    // Fall back to script location for non-git repos
-    const scriptDir = import.meta.dir;
-    // Navigate up from .speck/scripts/common to repo root
-    return path.resolve(scriptDir, "../../..");
+    // Fall back to current working directory for non-git repos
+    // This ensures hooks work correctly when executed from user's directory
+    return process.cwd();
   }
 }
 
