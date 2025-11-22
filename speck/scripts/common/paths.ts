@@ -663,6 +663,14 @@ export async function getCurrentBranch(repoRoot: string): Promise<string> {
  */
 export async function hasGit(): Promise<boolean> {
   try {
+    // Check for .git directory first (most reliable, especially in bundled contexts)
+    const cwd = process.cwd();
+    const gitDir = path.join(cwd, ".git");
+    if (existsSync(gitDir)) {
+      return true;
+    }
+
+    // Fall back to git command (handles worktrees and other edge cases)
     await $`git rev-parse --show-toplevel`.quiet();
     return true;
   } catch {
