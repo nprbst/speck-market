@@ -68,7 +68,7 @@ export interface CheckUpstreamOutput {
 /**
  * CLI options for /speck.pull-upstream
  */
-export interface PullUpstreamOptions extends BaseCliOptions {
+export interface PullUpstreamOptions extends Omit<BaseCliOptions, 'version'> {
   /** Release version to pull (required, positional arg) */
   version: string;
 }
@@ -87,7 +87,7 @@ export interface PullUpstreamOutput {
 /**
  * CLI options for /speck.transform-upstream
  */
-export interface TransformUpstreamOptions extends BaseCliOptions {
+export interface TransformUpstreamOptions extends Omit<BaseCliOptions, 'version'> {
   /** Specific version to transform (optional, defaults to latest) */
   version?: string;
 }

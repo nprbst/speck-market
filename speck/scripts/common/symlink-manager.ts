@@ -4,8 +4,7 @@
  * Manages the upstream/latest symlink that points to the most recent release.
  */
 
-import { existsSync, lstatSync, unlinkSync, symlinkSync, readlinkSync } from "fs";
-import { dirname } from "path";
+import { lstatSync, unlinkSync, symlinkSync, readlinkSync } from "fs";
 
 /**
  * Symlink manager error
@@ -42,12 +41,13 @@ export function createSymlink(
       throw new SymlinkManagerError(
         `Symlink already exists at ${linkPath}. Use updateSymlink() to replace.`
       );
-    } catch (error: any) {
+    } catch (error) {
       if (error instanceof SymlinkManagerError) {
         throw error;
       }
       // ENOENT means path doesn't exist, which is what we want
-      if (error.code !== "ENOENT") {
+      const err = error as NodeJS.ErrnoException;
+      if (err.code !== "ENOENT") {
         throw error;
       }
     }
@@ -91,12 +91,13 @@ export function updateSymlink(
           `Path ${linkPath} exists but is not a symlink`
         );
       }
-    } catch (error: any) {
+    } catch (error) {
       if (error instanceof SymlinkManagerError) {
         throw error;
       }
       // ENOENT means path doesn't exist, which is fine for update
-      if (error.code !== "ENOENT") {
+      const err = error as NodeJS.ErrnoException;
+      if (err.code !== "ENOENT") {
         throw error;
       }
     }
@@ -138,11 +139,12 @@ export function readSymlink(linkPath: string): string {
     }
 
     return readlinkSync(linkPath);
-  } catch (error: any) {
+  } catch (error) {
     if (error instanceof SymlinkManagerError) {
       throw error;
     }
-    if (error.code === "ENOENT") {
+    const err = error as NodeJS.ErrnoException;
+    if (err.code === "ENOENT") {
       throw new SymlinkManagerError(`Symlink not found: ${linkPath}`);
     }
     throw new SymlinkManagerError(
@@ -190,11 +192,12 @@ export function removeSymlink(linkPath: string): void {
     }
 
     unlinkSync(linkPath);
-  } catch (error: any) {
+  } catch (error) {
     if (error instanceof SymlinkManagerError) {
       throw error;
     }
-    if (error.code === "ENOENT") {
+    const err = error as NodeJS.ErrnoException;
+    if (err.code === "ENOENT") {
       throw new SymlinkManagerError(`Symlink not found: ${linkPath}`);
     }
     throw new SymlinkManagerError(

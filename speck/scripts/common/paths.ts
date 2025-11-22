@@ -17,13 +17,59 @@
 
 import { existsSync } from "node:fs";
 import { readdirSync } from "node:fs";
+import fs from "node:fs/promises";
 import path from "node:path";
 import { $ } from "bun";
+
+// [SPECK-EXTENSION:START] Multi-repo detection
+/**
+ * Speck configuration - detected mode and paths
+ */
+export interface SpeckConfig {
+  mode: 'single-repo' | 'multi-repo';
+  speckRoot: string;     // Directory containing specs/
+  repoRoot: string;      // Git repository root
+  specsDir: string;      // Full path to specs/
+}
+
+/**
+ * Multi-repo context metadata (Feature 009)
+ * Extended version of SpeckConfig with context information
+ */
+export interface MultiRepoContextMetadata extends SpeckConfig {
+  context: 'single' | 'root' | 'child';  // Execution context
+  parentSpecId: string | null;           // Parent spec ID (child context only)
+  childRepoName: string | null;          // Child directory name (child context only)
+}
+// [SPECK-EXTENSION:END]
+
+/**
+ * Branch entry in branches.json (Feature 008)
+ */
+interface BranchEntry {
+  name: string;
+  specId?: string;
+  parentSpecId?: string;
+  [key: string]: unknown;
+}
+
+/**
+ * Branches mapping file structure (Feature 008)
+ */
+interface BranchesMapping {
+  branches?: BranchEntry[];
+  [key: string]: unknown;
+}
 
 /**
  * Feature paths returned by getFeaturePaths()
  */
 export interface FeaturePaths {
+  // [SPECK-EXTENSION:START] Multi-repo fields
+  MODE: 'single-repo' | 'multi-repo';
+  SPECK_ROOT: string;
+  SPECS_DIR: string;
+  // [SPECK-EXTENSION:END]
   REPO_ROOT: string;
   CURRENT_BRANCH: string;
   HAS_GIT: string;
@@ -144,6 +190,425 @@ export async function getRepoRoot(): Promise<string> {
   }
 }
 
+// [SPECK-EXTENSION:START] Multi-repo detection
+/**
+ * Cache for detectSpeckRoot() to avoid repeated filesystem checks
+ */
+let cachedConfig: SpeckConfig | null = null;
+
+/**
+ * Clear the cached speck configuration
+ * Useful when .speck/root symlink is modified
+ */
+export function clearSpeckCache(): void {
+  cachedConfig = null;
+}
+
+/**
+ * Detect speck root and operating mode
+ *
+ * Checks for .speck/root symlink to determine if running in multi-repo mode.
+ * - Single-repo: No symlink, specs at repo root
+ * - Multi-repo: Symlink present, specs at symlink target
+ *
+ * @returns SpeckConfig with mode, speckRoot, repoRoot, specsDir
+ */
+export async function detectSpeckRoot(): Promise<SpeckConfig> {
+  // Return cached result if available
+  if (cachedConfig) {
+    return cachedConfig;
+  }
+
+  const repoRoot = await getRepoRoot();
+  const symlinkPath = path.join(repoRoot, '.speck', 'root');
+
+  try {
+    const stats = await fs.lstat(symlinkPath);
+
+    if (!stats.isSymbolicLink()) {
+      console.warn(
+        'WARNING: .speck/root exists but is not a symlink\n' +
+        'Expected: symlink to speck root directory\n' +
+        'Found: regular file/directory\n' +
+        'Falling back to single-repo mode.\n' +
+        'To enable multi-repo: mv .speck/root .speck/root.backup && /speck.link <path>'
+      );
+      const config: SpeckConfig = {
+        mode: 'single-repo',
+        speckRoot: repoRoot,
+        repoRoot,
+        specsDir: path.join(repoRoot, 'specs')
+      };
+      cachedConfig = config;
+      return config;
+    }
+
+    // Resolve symlink to absolute path
+    const speckRoot = await fs.realpath(symlinkPath);
+
+    // T094 - Security: Validate symlink target doesn't escape to sensitive paths
+    // Reject paths that point to system directories or parent of home
+    const dangerousPaths = ['/', '/etc', '/usr', '/bin', '/sbin', '/System', '/Library'];
+    const homeDir = process.env.HOME || process.env.USERPROFILE || '';
+    if (dangerousPaths.some(dangerous => speckRoot === dangerous || speckRoot.startsWith(dangerous + '/'))) {
+      throw new Error(
+        `Security: .speck/root symlink points to system directory: ${speckRoot}\n` +
+        'Speck root must be a user-owned project directory.\n' +
+        'Fix: rm .speck/root && /speck.link <safe-project-path>'
+      );
+    }
+    if (homeDir && speckRoot === path.dirname(homeDir)) {
+      throw new Error(
+        `Security: .speck/root symlink points above home directory: ${speckRoot}\n` +
+        'Fix: rm .speck/root && /speck.link <project-path-within-home>'
+      );
+    }
+
+    // Verify target exists
+    await fs.access(speckRoot);
+
+    // [SPECK-EXTENSION:START] Warn if local specs/ directory exists in multi-repo mode (T062)
+    const localSpecsDir = path.join(repoRoot, 'specs');
+    try {
+      const stats = await fs.stat(localSpecsDir);
+      if (stats.isDirectory() && speckRoot !== repoRoot) {
+        console.warn(
+          'WARNING: Local specs/ directory exists in multi-repo mode\n' +
+          `  Local: ${localSpecsDir}\n` +
+          `  Shared: ${path.join(speckRoot, 'specs')}\n` +
+          'In multi-repo mode, specs are read from the shared speck root.\n' +
+          'The local specs/ directory is ignored.\n' +
+          'To migrate local specs to shared location:\n' +
+          `  1. Copy specs: cp -r ${localSpecsDir}/* ${path.join(speckRoot, 'specs')}/\n` +
+          `  2. Remove local specs: rm -rf ${localSpecsDir}\n`
+        );
+      }
+    } catch (error) {
+      // Local specs/ does not exist - this is expected in multi-repo mode
+      const err = error as NodeJS.ErrnoException;
+      if (err.code !== 'ENOENT') {
+        // Log unexpected errors but don't throw - allow multi-repo mode to work
+        console.warn(`Warning: Could not check local specs/ directory: ${err.message}`);
+      }
+    }
+    // [SPECK-EXTENSION:END]
+
+    const config: SpeckConfig = {
+      mode: 'multi-repo',
+      speckRoot,
+      repoRoot,
+      specsDir: path.join(speckRoot, 'specs')
+    };
+    cachedConfig = config;
+    return config;
+
+  } catch (error) {
+    const err = error as NodeJS.ErrnoException;
+    if (err.code === 'ENOENT') {
+      // Symlink does not exist - check if this is a multi-repo root
+      // Multi-repo root has .speck-link-* symlinks pointing to child repos
+      const childRepos = await findChildRepos(repoRoot);
+
+      if (childRepos.length > 0) {
+        // This is a multi-repo root (has child repos linked)
+        const config: SpeckConfig = {
+          mode: 'multi-repo',
+          speckRoot: repoRoot,
+          repoRoot,
+          specsDir: path.join(repoRoot, 'specs')
+        };
+        cachedConfig = config;
+        return config;
+      }
+
+      // No child repos found - truly single-repo mode
+      const config: SpeckConfig = {
+        mode: 'single-repo',
+        speckRoot: repoRoot,
+        repoRoot,
+        specsDir: path.join(repoRoot, 'specs')
+      };
+      cachedConfig = config;
+      return config;
+    }
+
+    if (err.code === 'ELOOP') {
+      throw new Error(
+        'Multi-repo configuration broken: .speck/root contains circular reference\n' +
+        'Fix: rm .speck/root && /speck.link <valid-path>'
+      );
+    }
+
+    // Broken symlink (target does not exist)
+    const target = await fs.readlink(symlinkPath).catch(() => 'unknown');
+    throw new Error(
+      `Multi-repo configuration broken: .speck/root → ${target} (does not exist)\n` +
+      'Fix:\n' +
+      '  1. Remove broken symlink: rm .speck/root\n' +
+      '  2. Link to correct location: /speck.link <path-to-speck-root>'
+    );
+  }
+}
+
+/**
+ * Backward compatibility alias for detectSpeckRoot
+ * @deprecated Use detectSpeckRoot() instead
+ */
+export const detectSpeckMode = detectSpeckRoot;
+
+/**
+ * T006 - Check if current repository is a multi-repo child (Feature 009)
+ *
+ * @returns true if in multi-repo mode and current repo is NOT the speck root
+ */
+export async function isMultiRepoChild(): Promise<boolean> {
+  const config = await detectSpeckRoot();
+  return config.mode === 'multi-repo' && config.repoRoot !== config.speckRoot;
+}
+
+/**
+ * T007 - Get child repository name (Feature 009)
+ *
+ * Extracts the child repo name from the .speck-link-* symlink in the speck root.
+ * Falls back to basename if no symlink found (e.g., in single-repo mode).
+ *
+ * @param repoRoot - Child repository root path
+ * @param speckRoot - Speck root path
+ * @returns Directory name of child repo (from symlink name or basename)
+ */
+export async function getChildRepoName(repoRoot: string, speckRoot: string): Promise<string> {
+  try {
+    // Resolve repoRoot to absolute path for comparison
+    const resolvedRepoRoot = await fs.realpath(repoRoot);
+
+    // Scan speck root for .speck-link-* symlinks
+    const entries = await fs.readdir(speckRoot, { withFileTypes: true });
+
+    for (const entry of entries) {
+      if (entry.isSymbolicLink() && entry.name.startsWith('.speck-link-')) {
+        const symlinkPath = path.join(speckRoot, entry.name);
+
+        try {
+          // Resolve symlink target
+          const targetPath = await fs.realpath(symlinkPath);
+
+          // If this symlink points to our repo, extract name from symlink
+          if (targetPath === resolvedRepoRoot) {
+            // Extract name from .speck-link-{name} pattern
+            return entry.name.replace(/^\.speck-link-/, '');
+          }
+        } catch {
+          // Broken symlink - skip
+          continue;
+        }
+      }
+    }
+  } catch {
+    // If lookup fails, fall back to basename
+  }
+
+  // Fallback: use directory basename (for single-repo mode or if symlink not found)
+  return path.basename(repoRoot);
+}
+
+/**
+ * T008 - Find all child repositories via symlinks (Feature 009)
+ *
+ * Scans speck root for .speck-link-* symlinks and returns child repo paths
+ *
+ * @param speckRoot - Speck root directory path
+ * @returns Array of absolute paths to child repositories
+ */
+export async function findChildRepos(speckRoot: string): Promise<string[]> {
+  const childRepos: string[] = [];
+
+  try {
+    const entries = await fs.readdir(speckRoot, { withFileTypes: true });
+
+    for (const entry of entries) {
+      // Look for symlinks matching .speck-link-* pattern
+      if (entry.isSymbolicLink() && entry.name.startsWith('.speck-link-')) {
+        const symlinkPath = path.join(speckRoot, entry.name);
+
+        try {
+          // Resolve symlink to absolute path
+          const targetPath = await fs.realpath(symlinkPath);
+
+          // T094 - Security: Validate child repo symlink doesn't point to dangerous paths
+          const dangerousPaths = ['/', '/etc', '/usr', '/bin', '/sbin', '/System', '/Library'];
+          if (dangerousPaths.some(dangerous => targetPath === dangerous || targetPath.startsWith(dangerous + '/'))) {
+            console.warn(`Security: Skipping ${entry.name} - points to system directory: ${targetPath}`);
+            continue;
+          }
+
+          // Verify target is a directory and has .git
+          const gitDir = path.join(targetPath, '.git');
+          try {
+            await fs.access(gitDir);
+            childRepos.push(targetPath);
+          } catch {
+            // Not a git repository - skip
+            console.warn(`Warning: ${entry.name} points to non-git directory: ${targetPath}`);
+          }
+        } catch (error) {
+          // Broken symlink - skip with warning
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          console.warn(`Warning: Broken symlink ${entry.name}: ${errorMessage}`);
+        }
+      }
+    }
+  } catch (error) {
+    // If speckRoot doesn't exist or can't be read, return empty array
+    const err = error as NodeJS.ErrnoException;
+    if (err.code !== 'ENOENT') {
+      throw error;
+    }
+  }
+
+  return childRepos;
+}
+
+/**
+ * T037 - Find child repositories with their logical names (Feature 009)
+ *
+ * Returns map of logical child repo name (from symlink) to repo path.
+ * Used for aggregate status display with user-friendly names.
+ *
+ * @param speckRoot - Speck root directory path
+ * @returns Map of child repo name → repo path
+ *
+ * @example
+ * ```typescript
+ * const children = await findChildReposWithNames("/path/to/root");
+ * // Returns: Map { "backend-service" => "/tmp/backend-1234", "frontend-app" => "/tmp/frontend-5678" }
+ * ```
+ */
+export async function findChildReposWithNames(speckRoot: string): Promise<Map<string, string>> {
+  const childRepos = new Map<string, string>();
+
+  try {
+    const entries = await fs.readdir(speckRoot, { withFileTypes: true });
+
+    for (const entry of entries) {
+      // Look for symlinks matching .speck-link-* pattern
+      if (entry.isSymbolicLink() && entry.name.startsWith('.speck-link-')) {
+        const symlinkPath = path.join(speckRoot, entry.name);
+
+        // Extract logical name from symlink: .speck-link-backend-service → backend-service
+        const logicalName = entry.name.substring('.speck-link-'.length);
+
+        try {
+          // Resolve symlink to absolute path
+          const targetPath = await fs.realpath(symlinkPath);
+
+          // T094 - Security: Validate child repo symlink doesn't point to dangerous paths
+          const dangerousPaths = ['/', '/etc', '/usr', '/bin', '/sbin', '/System', '/Library'];
+          if (dangerousPaths.some(dangerous => targetPath === dangerous || targetPath.startsWith(dangerous + '/'))) {
+            console.warn(`Security: Skipping ${entry.name} - points to system directory: ${targetPath}`);
+            continue;
+          }
+
+          // Verify target is a directory and has .git
+          const gitDir = path.join(targetPath, '.git');
+          try {
+            await fs.access(gitDir);
+            childRepos.set(logicalName, targetPath);
+          } catch {
+            // Not a git repository - skip
+            console.warn(`Warning: ${entry.name} points to non-git directory: ${targetPath}`);
+          }
+        } catch (error) {
+          // Broken symlink - skip with warning
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          console.warn(`Warning: Broken symlink ${entry.name}: ${errorMessage}`);
+        }
+      }
+    }
+  } catch (error) {
+    // If speckRoot doesn't exist or can't be read, return empty map
+    const err = error as NodeJS.ErrnoException;
+    if (err.code !== 'ENOENT') {
+      throw error;
+    }
+  }
+
+  return childRepos;
+}
+
+/**
+ * T009 - Get multi-repo context metadata with context field (Feature 009)
+ *
+ * Extended version of detectSpeckRoot() that determines execution context
+ *
+ * @returns MultiRepoContextMetadata with context, parentSpecId, childRepoName
+ */
+export async function getMultiRepoContext(): Promise<MultiRepoContextMetadata> {
+  const config = await detectSpeckRoot();
+
+  // Single-repo mode
+  if (config.mode === 'single-repo') {
+    return {
+      ...config,
+      context: 'single',
+      parentSpecId: null,
+      childRepoName: null,
+    };
+  }
+
+  // Multi-repo: determine if root or child
+  if (config.repoRoot === config.speckRoot) {
+    // Root context
+    return {
+      ...config,
+      context: 'root',
+      parentSpecId: null,
+      childRepoName: null,
+    };
+  } else {
+    // Child context - extract parentSpecId from branches.json
+    const childRepoName = await getChildRepoName(config.repoRoot, config.speckRoot);
+
+    // Try to determine parent spec by reading from branches.json
+    let parentSpecId: string | null = null;
+    try {
+      const branchesJsonPath = path.join(config.repoRoot, '.speck', 'branches.json');
+      const content = await fs.readFile(branchesJsonPath, 'utf-8');
+      const branchMapping = JSON.parse(content) as { branches?: Array<{ parentSpecId?: string | null }> };
+
+      // Get parentSpecId from the first branch entry (all branches in child repo should have same parentSpecId)
+      if (branchMapping.branches && branchMapping.branches.length > 0) {
+        parentSpecId = branchMapping.branches[0]?.parentSpecId || null;
+      }
+    } catch {
+      // If we can't read branches.json or it doesn't exist, leave parentSpecId as null
+    }
+
+    // T108a - If no parentSpecId found in branches.json, detect from root repo's current branch
+    if (!parentSpecId) {
+      try {
+        const { $ } = await import("bun");
+        const result = await $`git -C ${config.speckRoot} rev-parse --abbrev-ref HEAD`.quiet();
+        const currentBranch = result.stdout.toString().trim();
+
+        // Check if current branch matches spec pattern (NNN-feature-name)
+        if (/^\d{3}-/.test(currentBranch)) {
+          parentSpecId = currentBranch;
+        }
+      } catch {
+        // Ignore errors - leave parentSpecId as null
+      }
+    }
+
+    return {
+      ...config,
+      context: 'child',
+      parentSpecId,
+      childRepoName,
+    };
+  }
+}
+// [SPECK-EXTENSION:END]
+
 /**
  * Get current branch name
  *
@@ -175,7 +640,7 @@ export async function getCurrentBranch(repoRoot: string): Promise<string> {
       for (const dir of dirs) {
         if (dir.isDirectory()) {
           const match = dir.name.match(/^(\d{3})-/);
-          if (match) {
+          if (match && match[1]) {
             const number = parseInt(match[1], 10);
             if (number > highest) {
               highest = number;
@@ -207,18 +672,54 @@ export async function hasGit(): Promise<boolean> {
 }
 
 /**
+ * Validate branch name using git check-ref-format (T016)
+ *
+ * @param branchName - Branch name to validate
+ * @returns true if valid git ref name, false otherwise
+ */
+export async function validateBranchName(branchName: string): Promise<boolean> {
+  try {
+    const result = await $`git check-ref-format --branch ${branchName}`.quiet();
+    return result.exitCode === 0;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Check if on a valid feature branch
  *
  * @param branch - Branch name to check
  * @param hasGitRepo - Whether we have a git repo
  * @returns true if valid, false otherwise (prints error to stderr)
  */
-export function checkFeatureBranch(branch: string, hasGitRepo: boolean): boolean {
+export async function checkFeatureBranch(branch: string, hasGitRepo: boolean, repoRoot: string): Promise<boolean> {
   // For non-git repos, we can't enforce branch naming
   if (!hasGitRepo) {
     console.error("[specify] Warning: Git repository not detected; skipped branch validation");
     return true;
   }
+
+  // [STACKED-PR:START] T015 - Skip NNN-pattern enforcement if branches.json exists
+  const branchesFile = path.join(repoRoot, ".speck", "branches.json");
+  if (existsSync(branchesFile)) {
+    try {
+      const content = await fs.readFile(branchesFile, "utf-8");
+      const mapping = JSON.parse(content) as BranchesMapping;
+
+      // Check if current branch is in branches.json
+      if (mapping.branches && Array.isArray(mapping.branches)) {
+        const branchExists = mapping.branches.some((b) => b.name === branch);
+        if (branchExists) {
+          // Branch is in stacked mode - no NNN-pattern required
+          return true;
+        }
+      }
+    } catch {
+      // If branches.json is malformed, fall through to traditional validation
+    }
+  }
+  // [STACKED-PR:END]
 
   // Check if branch matches pattern: ###-feature-name
   if (!/^\d{3}-/.test(branch)) {
@@ -244,9 +745,31 @@ export function getFeatureDir(repoRoot: string, branchName: string): string {
  *
  * Allows multiple branches to work on the same spec (e.g., 004-fix-bug, 004-add-feature)
  * Both would map to the first directory found starting with "004-"
+ *
+ * [SPECK-EXTENSION] Updated to accept specsDir parameter for multi-repo support
+ * [STACKED-PR] T014 - Check branches.json first before falling back to numeric prefix
  */
-export function findFeatureDirByPrefix(repoRoot: string, branchName: string): string {
-  const specsDir = path.join(repoRoot, "specs");
+export async function findFeatureDirByPrefix(specsDir: string, branchName: string, repoRoot: string): Promise<string> {
+  // [STACKED-PR:START] T014 - Check branches.json first
+  const branchesFile = path.join(repoRoot, ".speck", "branches.json");
+  if (existsSync(branchesFile)) {
+    try {
+      const content = await fs.readFile(branchesFile, "utf-8");
+      const mapping = JSON.parse(content) as BranchesMapping;
+
+      // Find branch in mapping
+      if (mapping.branches && Array.isArray(mapping.branches)) {
+        const branch = mapping.branches.find((b) => b.name === branchName);
+        if (branch && branch.specId) {
+          // Found in branches.json - use specId
+          return path.join(specsDir, branch.specId);
+        }
+      }
+    } catch {
+      // If branches.json is malformed, fall through to traditional lookup
+    }
+  }
+  // [STACKED-PR:END]
 
   // Extract numeric prefix from branch (e.g., "004" from "004-whatever")
   const match = branchName.match(/^(\d{3})-/);
@@ -272,7 +795,7 @@ export function findFeatureDirByPrefix(repoRoot: string, branchName: string): st
   if (matches.length === 0) {
     // No match found - return the branch name path (will fail later with clear error)
     return path.join(specsDir, branchName);
-  } else if (matches.length === 1) {
+  } else if (matches.length === 1 && matches[0]) {
     // Exactly one match - perfect!
     return path.join(specsDir, matches[0]);
   } else {
@@ -287,28 +810,71 @@ export function findFeatureDirByPrefix(repoRoot: string, branchName: string): st
  * Get all feature-related paths
  *
  * This is the main function used by other scripts to get their working environment.
+ *
+ * [SPECK-EXTENSION] Updated to use detectSpeckRoot() for multi-repo support
  */
 export async function getFeaturePaths(): Promise<FeaturePaths> {
-  const repoRoot = await getRepoRoot();
-  const currentBranch = await getCurrentBranch(repoRoot);
+  // [SPECK-EXTENSION:START] Multi-repo path resolution
+  const config = await detectSpeckRoot();
+  const currentBranch = await getCurrentBranch(config.repoRoot);
   const hasGitRepo = await hasGit();
 
   // Use prefix-based lookup to support multiple branches per spec
-  const featureDir = findFeatureDirByPrefix(repoRoot, currentBranch);
+  const featureDir = await findFeatureDirByPrefix(config.specsDir, currentBranch, config.repoRoot);
+  const featureName = path.basename(featureDir);
 
   return {
-    REPO_ROOT: repoRoot,
+    MODE: config.mode,
+    SPECK_ROOT: config.speckRoot,
+    SPECS_DIR: config.specsDir,
+    REPO_ROOT: config.repoRoot,
     CURRENT_BRANCH: currentBranch,
     HAS_GIT: hasGitRepo ? "true" : "false",
     FEATURE_DIR: featureDir,
-    FEATURE_SPEC: path.join(featureDir, "spec.md"),
-    IMPL_PLAN: path.join(featureDir, "plan.md"),
-    TASKS: path.join(featureDir, "tasks.md"),
-    RESEARCH: path.join(featureDir, "research.md"),
-    DATA_MODEL: path.join(featureDir, "data-model.md"),
-    QUICKSTART: path.join(featureDir, "quickstart.md"),
-    CONTRACTS_DIR: path.join(featureDir, "contracts"),
+    FEATURE_SPEC: path.join(featureDir, "spec.md"),  // Uses specsDir (shared in multi-repo)
+    IMPL_PLAN: path.join(config.repoRoot, "specs", featureName, "plan.md"),  // Always local
+    TASKS: path.join(config.repoRoot, "specs", featureName, "tasks.md"),  // Always local
+    RESEARCH: path.join(featureDir, "research.md"),  // Uses specsDir (shared in multi-repo)
+    DATA_MODEL: path.join(featureDir, "data-model.md"),  // Uses specsDir (shared in multi-repo)
+    QUICKSTART: path.join(featureDir, "quickstart.md"),  // Uses specsDir (shared in multi-repo)
+    CONTRACTS_DIR: path.join(featureDir, "contracts"),  // Uses specsDir (shared in multi-repo)
   };
+  // [SPECK-EXTENSION:END]
+}
+
+/**
+ * Read workflow mode from constitution.md
+ *
+ * Searches for: **Default Workflow Mode**: stacked-pr | single-branch
+ *
+ * @returns "stacked-pr" | "single-branch" | null (if not found)
+ */
+export async function getDefaultWorkflowMode(): Promise<"stacked-pr" | "single-branch" | null> {
+  try {
+    // Use getRepoRoot instead of detectSpeckRoot to avoid cache issues in tests
+    // The constitution file is always at repoRoot/.speck/memory/constitution.md
+    const repoRoot = await getRepoRoot();
+    const constitutionPath = path.join(repoRoot, ".speck/memory/constitution.md");
+
+    if (!existsSync(constitutionPath)) {
+      return null;
+    }
+
+    const content = await fs.readFile(constitutionPath, "utf-8");
+
+    // Search for: **Default Workflow Mode**: stacked-pr
+    // or: **Default Workflow Mode**: single-branch
+    const match = content.match(/^\*\*Default Workflow Mode\*\*:\s*(stacked-pr|single-branch)\s*$/m);
+
+    if (match && (match[1] === "stacked-pr" || match[1] === "single-branch")) {
+      return match[1];
+    }
+
+    return null;
+  } catch (error) {
+    // If file read fails or parsing errors, return null (graceful degradation)
+    return null;
+  }
 }
 
 /**
@@ -335,3 +901,77 @@ export function checkDir(dirPath: string, label: string): string {
     return `  ✗ ${label}`;
   }
 }
+
+// [SPECK-EXTENSION:START] T069: Utility to sync contracts/ from shared to local
+/**
+ * Sync shared contracts/ directory to local repo via symlink
+ *
+ * In multi-repo mode with shared specs, this creates a symlink from
+ * local specs/NNN-feature/contracts/ to shared speckRoot/specs/NNN-feature/contracts/
+ *
+ * @param featureName - Feature directory name (e.g., "007-multi-repo-support")
+ * @returns true if symlink created/already exists, false if not needed
+ */
+export async function syncSharedContracts(featureName: string): Promise<boolean> {
+  const config = await detectSpeckRoot();
+
+  // Only applies to multi-repo mode
+  if (config.mode !== 'multi-repo') {
+    return false;
+  }
+
+  // Check if shared contracts/ exists
+  const sharedContractsDir = path.join(config.speckRoot, 'specs', featureName, 'contracts');
+  if (!existsSync(sharedContractsDir)) {
+    return false;
+  }
+
+  // Create local feature directory if it doesn't exist
+  const localFeatureDir = path.join(config.repoRoot, 'specs', featureName);
+  if (!existsSync(localFeatureDir)) {
+    return false; // Feature dir doesn't exist locally yet
+  }
+
+  const localContractsLink = path.join(localFeatureDir, 'contracts');
+
+  // Check if symlink already exists
+  try {
+    const stats = await fs.lstat(localContractsLink);
+    if (stats.isSymbolicLink()) {
+      // Verify it points to the right location
+      const resolved = await fs.realpath(localContractsLink);
+      if (resolved === sharedContractsDir) {
+        return true; // Already correctly linked
+      }
+      // Pointing to wrong location - remove and recreate
+      await fs.unlink(localContractsLink);
+    } else {
+      // Exists but not a symlink - warn and don't overwrite
+      console.warn(
+        `WARNING: Local contracts/ directory exists but is not a symlink\n` +
+        `  Local: ${localContractsLink}\n` +
+        `  Shared: ${sharedContractsDir}\n` +
+        `  Skipping symlink creation to preserve local data.`
+      );
+      return false;
+    }
+  } catch (error) {
+    const err = error as NodeJS.ErrnoException;
+    if (err.code !== 'ENOENT') throw error;
+    // Symlink doesn't exist - we'll create it
+  }
+
+  // Calculate relative path for symlink
+  const relativePath = path.relative(localFeatureDir, sharedContractsDir);
+
+  // Create symlink
+  try {
+    await fs.symlink(relativePath, localContractsLink, 'dir');
+    return true;
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.warn(`Warning: Failed to create contracts/ symlink: ${errorMessage}`);
+    return false;
+  }
+}
+// [SPECK-EXTENSION:END]

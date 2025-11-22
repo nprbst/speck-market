@@ -61,9 +61,13 @@ export function createMockReleaseRegistry(
   releases?: UpstreamRelease[]
 ): ReleaseRegistry {
   const defaultReleases = releases || [createMockUpstreamRelease()];
+  const firstRelease = defaultReleases[0];
+  if (!firstRelease) {
+    throw new Error("At least one release required");
+  }
 
   return {
-    latest: defaultReleases[0].version,
+    latest: firstRelease.version,
     releases: defaultReleases,
   };
 }
@@ -106,7 +110,7 @@ export class MockFilesystem {
   private files = new Map<string, string>();
   private symlinks = new Map<string, string>();
 
-  async writeFile(path: string, content: string): Promise<void> {
+  writeFile(path: string, content: string): void {
     this.files.set(path, content);
   }
 
@@ -124,19 +128,19 @@ export class MockFilesystem {
     return content;
   }
 
-  async exists(path: string): Promise<boolean> {
+  exists(path: string): boolean {
     return this.files.has(path) || this.symlinks.has(path);
   }
 
-  async mkdir(path: string): Promise<void> {
+  async mkdir(_path: string): Promise<void> {
     // No-op for mock (assume directory creation always succeeds)
   }
 
-  async symlink(target: string, path: string): Promise<void> {
+  symlink(target: string, path: string): void {
     this.symlinks.set(path, target);
   }
 
-  async readlink(path: string): Promise<string> {
+  readlink(path: string): string {
     const target = this.symlinks.get(path);
     if (target === undefined) {
       throw new Error(`EINVAL: invalid argument, readlink '${path}'`);
@@ -144,12 +148,12 @@ export class MockFilesystem {
     return target;
   }
 
-  async unlink(path: string): Promise<void> {
+  unlink(path: string): void {
     this.files.delete(path);
     this.symlinks.delete(path);
   }
 
-  async rm(path: string, options?: { recursive?: boolean }): Promise<void> {
+  rm(path: string, options?: { recursive?: boolean }): void {
     // Simple implementation: remove exact path or all paths starting with path/
     if (options?.recursive) {
       const prefix = path.endsWith("/") ? path : path + "/";
@@ -197,10 +201,10 @@ export class MockGitHubApi {
     this.errorMessage = errorMessage;
   }
 
-  async fetchReleases(): Promise<{
+  fetchReleases(): {
     releases: GitHubRelease[];
     rateLimit: RateLimitInfo;
-  }> {
+  } {
     if (this.shouldFail) {
       throw new Error(this.errorMessage);
     }
@@ -282,14 +286,14 @@ export function assertJsonOutput<T>(
   result: CliResult,
   validator: (data: unknown) => T
 ): T {
-  if (result.exitCode !== 0) {
+  if (result.exitCode !== 0 as ExitCode) {
     throw new Error(
-      `Cannot validate JSON from failed command (exit ${result.exitCode}): ${result.stderr}`
+      `Cannot validate JSON from failed command (exit ${String(result.exitCode)}): ${result.stderr}`
     );
   }
 
   try {
-    const data = JSON.parse(result.stdout);
+    const data = JSON.parse(result.stdout) as unknown;
     return validator(data);
   } catch (error) {
     throw new Error(

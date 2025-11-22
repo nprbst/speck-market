@@ -14,19 +14,9 @@ $ARGUMENTS
 
 You **MUST** consider the user input before proceeding (if not empty).
 
-## Plugin Path Setup
-
-Before proceeding, determine the plugin root path by running:
-
-```bash
-cat "$HOME/.claude/speck-plugin-path" 2>/dev/null || echo ".speck"
-```
-
-Store this value and use `$PLUGIN_ROOT` in all subsequent paths (e.g., `$PLUGIN_ROOT/memory/constitution.md`).
-
 ## Outline
 
-You are updating the project-local constitution at `.speck/memory/constitution.md` (in the project root, NOT the plugin). If this file doesn't exist yet, copy it from the plugin template at `$PLUGIN_ROOT/memory/constitution.md` first. This file is a TEMPLATE containing placeholder tokens in square brackets (e.g. `[PROJECT_NAME]`, `[PRINCIPLE_1_NAME]`). Your job is to (a) collect/derive concrete values, (b) fill the template precisely, and (c) propagate any amendments across dependent artifacts.
+You are updating the project-local constitution at `.speck/memory/constitution.md` (in the project root, NOT the plugin). If this file doesn't exist yet, copy it from the plugin template at `.speck/memory/constitution.md` first. This file is a TEMPLATE containing placeholder tokens in square brackets (e.g. `[PROJECT_NAME]`, `[PRINCIPLE_1_NAME]`). Your job is to (a) collect/derive concrete values, (b) fill the template precisely, and (c) propagate any amendments across dependent artifacts.
 
 Follow this execution flow:
 

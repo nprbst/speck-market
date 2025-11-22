@@ -14,16 +14,6 @@ $ARGUMENTS
 
 You **MUST** consider the user input before proceeding (if not empty).
 
-## Plugin Path Setup
-
-Before proceeding, determine the plugin root path by running:
-
-```bash
-cat "$HOME/.claude/speck-plugin-path" 2>/dev/null || echo ".speck"
-```
-
-Store this value and use `$PLUGIN_ROOT` in all subsequent script paths (e.g., `bun run $PLUGIN_ROOT/scripts/...`).
-
 ## Outline
 
 Goal: Detect and reduce ambiguity or missing decision points in the active feature specification and record the clarifications directly in the spec file.
@@ -32,14 +22,37 @@ Note: This clarification workflow is expected to run (and be completed) BEFORE i
 
 Execution steps:
 
-1. Run `bun run $PLUGIN_ROOT/scripts/check-prerequisites.ts --json --paths-only` from repo root **once** (combined `--json --paths-only` mode / `-Json -PathsOnly`). Parse minimal JSON payload fields:
-   - `FEATURE_DIR`
-   - `FEATURE_SPEC`
-   - (Optionally capture `IMPL_PLAN`, `TASKS` for future chained flows.)
-   - If JSON parsing fails, abort and instruct user to re-run `/speck:specify` or verify feature branch environment.
-   - For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\''m Groot' (or double-quote if possible: "I'm Groot").
+1. Extract prerequisite context from the auto-injected comment in the prompt:
+   ```
+   <!-- SPECK_PREREQ_CONTEXT
+   {"MODE":"single-repo","FEATURE_DIR":"/path/to/specs/010-feature","AVAILABLE_DOCS":["spec.md"],"FILE_CONTENTS":{"spec.md":"..."}}
+   -->
+   ```
+   Use FEATURE_DIR and FILE_CONTENTS from this JSON.
 
-2. Load the current spec file. Perform a structured ambiguity & coverage scan using this taxonomy. For each category, mark status: Clear / Partial / Missing. Produce an internal coverage map used for prioritization (do not output raw map unless no questions will be asked).
+   **FILE_CONTENTS field**: Contains pre-loaded spec.md. Possible values:
+   - Full file content (string): File was successfully pre-loaded
+   - `"NOT_FOUND"`: File does not exist (abort - run /speck:specify first)
+   - `"TOO_LARGE"`: File exceeds size limits (use Read tool instead)
+
+   **Check FILE_CONTENTS from prerequisite context first**:
+   - If FILE_CONTENTS["spec.md"] exists and is NOT `"NOT_FOUND"` or `"TOO_LARGE"`: Use the pre-loaded content
+   - If FILE_CONTENTS["spec.md"] is `"TOO_LARGE"`: Use Read tool to load the file
+   - If FILE_CONTENTS["spec.md"] is `"NOT_FOUND"`: Abort with error (run /speck:specify first)
+   - If FILE_CONTENTS field is not present: Use Read tool (backwards compatibility)
+
+   **Fallback**: If the comment is not present (backwards compatibility), run:
+   ```bash
+   speck-check-prerequisites --json --paths-only
+   ```
+   Parse minimal JSON payload fields: FEATURE_DIR, FEATURE_SPEC.
+   If JSON parsing fails, abort and instruct user to re-run `/speck:specify` or verify feature branch environment.
+
+2. Load the current spec file:
+   - Use pre-loaded content from FILE_CONTENTS["spec.md"] (step 1) if available
+   - Otherwise use Read tool to load FEATURE_SPEC path
+
+   Perform a structured ambiguity & coverage scan using this taxonomy. For each category, mark status: Clear / Partial / Missing. Produce an internal coverage map used for prioritization (do not output raw map unless no questions will be asked).
 
    Functional Scope & Behavior:
    - Core user goals & success criteria

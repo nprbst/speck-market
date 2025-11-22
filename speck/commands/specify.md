@@ -18,16 +18,6 @@ $ARGUMENTS
 
 You **MUST** consider the user input before proceeding (if not empty).
 
-## Plugin Path Setup
-
-Before proceeding, determine the plugin root path by running:
-
-```bash
-cat "$HOME/.claude/speck-plugin-path" 2>/dev/null || echo ".speck"
-```
-
-Store this value and use `$PLUGIN_ROOT` in all subsequent script paths (e.g., `bun run $PLUGIN_ROOT/scripts/...`).
-
 ## Outline
 
 The text the user typed after `/speck:specify` in the triggering message **is** the feature description. Assume you always have it available in this conversation even if `$ARGUMENTS` appears literally below. Do not ask the user to repeat it unless they provided an empty command.
@@ -63,9 +53,21 @@ Given that feature description, do this:
       - Find the highest number N
       - Use N+1 for the new branch number
 
-   d. Run the script `bun run $PLUGIN_ROOT/scripts/create-new-feature.ts --json "$ARGUMENTS"` with the calculated number and short-name:
+   d. **Detect multi-repo mode and prompt for spec location** (T063):
+      - Run: `speck-check-prerequisites --json --skip-feature-check`
+      - Parse the JSON output and extract the `MODE` field
+      - If `MODE` is `"multi-repo"`:
+        - **Ask the user**: "Create spec at parent (shared across repos) or local (this repo only)? (parent/local)"
+        - **Wait for user response**
+        - Store the answer as `SPEC_LOCATION` (either "parent" or "local")
+      - If `MODE` is `"single-repo"`:
+        - Set `SPEC_LOCATION = "local"` (no prompt needed)
+
+   e. Run the script `speck-create-new-feature --json "$ARGUMENTS"` with the calculated number and short-name:
       - Pass `--number N+1` and `--short-name "your-short-name"` along with the feature description
-      - Bash example: `bun run $PLUGIN_ROOT/scripts/create-new-feature.ts --json "$ARGUMENTS" --json --number 5 --short-name "user-auth" "Add user authentication"`
+      - **If multi-repo mode and user chose "parent"**: Add `--shared-spec` flag
+      - **If multi-repo mode and user chose "local"**: Add `--local-spec` flag (or omit flag - local is default)
+      - Bash example: `speck-create-new-feature --json --number 5 --short-name "user-auth" --shared-spec "Add user authentication"`
 
    **IMPORTANT**:
    - Check all three sources (remote branches, local branches, specs directories) to find the highest number

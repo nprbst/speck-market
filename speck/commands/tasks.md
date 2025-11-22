@@ -19,37 +19,87 @@ $ARGUMENTS
 
 You **MUST** consider the user input before proceeding (if not empty).
 
-## Plugin Path Setup
+## Flag Support
 
-Before proceeding, determine the plugin root path by running:
+This command supports the following flags for branch-aware task generation (US4):
 
+- `--branch <name>`: Generate tasks for specific branch (requires stacked PR mode)
+- `--stories <US1,US2>`: Filter to specific user stories (comma-separated)
+
+**Examples**:
 ```bash
-cat "$HOME/.claude/speck-plugin-path" 2>/dev/null || echo ".speck"
+/speck:tasks --branch username/db-layer --stories US1
+/speck:tasks --stories US1,US2
+/speck:tasks --branch username/api
 ```
-
-Store this value and use `$PLUGIN_ROOT` in all subsequent script paths (e.g., `bun run $PLUGIN_ROOT/scripts/...`).
 
 ## Outline
 
-1. **Setup**: Run `bun run $PLUGIN_ROOT/scripts/check-prerequisites.ts --json` from repo root and parse FEATURE_DIR and AVAILABLE_DOCS list. All paths must be absolute. For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\''m Groot' (or double-quote if possible: "I'm Groot").
+1. **Parse flags from $ARGUMENTS** (T050-T054):
+   - Check for `--branch <name>` flag and extract branch name
+   - Check for `--stories <US1,US2>` flag and extract comma-separated story IDs
+   - If `--branch` provided: Load `.speck/branches.json` (T052) and validate branch exists (T053)
+   - If `--stories` provided: Store story IDs for filtering (will validate against spec.md later) (T054)
 
-2. **Load design documents**: Read from FEATURE_DIR:
-   - **Required**: plan.md (tech stack, libraries, structure), spec.md (user stories with priorities)
-   - **Optional**: data-model.md (entities), contracts/ (API endpoints), research.md (decisions), quickstart.md (test scenarios)
-   - Note: Not all projects have all documents. Generate tasks based on what's available.
+2. **Setup**: Extract prerequisite context from the auto-injected comment in the prompt:
+   ```
+   <!-- SPECK_PREREQ_CONTEXT
+   {"MODE":"single-repo","FEATURE_DIR":"/path/to/specs/010-feature","AVAILABLE_DOCS":["plan.md","spec.md","research.md"],"FILE_CONTENTS":{"plan.md":"...","spec.md":"...","data-model.md":"...","research.md":"..."}}
+   -->
+   ```
+   Use the FEATURE_DIR, AVAILABLE_DOCS, and FILE_CONTENTS values from this JSON. All paths are absolute.
 
-3. **Execute task generation workflow**:
+   **FILE_CONTENTS field**: Contains pre-loaded file contents. Possible values:
+   - Full file content (string): File was successfully pre-loaded
+   - `"NOT_FOUND"`: File does not exist
+   - `"TOO_LARGE"`: File exceeds size limits (use Read tool instead)
+
+   Pre-loaded files: `plan.md`, `spec.md`, `data-model.md`, `research.md`
+
+   **Fallback**: If the comment is not present (backwards compatibility), run:
+   ```bash
+   speck-check-prerequisites --json
+   ```
+
+3. **Load design documents**: Read from FEATURE_DIR:
+   **Check FILE_CONTENTS from prerequisite context first** (step 2):
+   - For plan.md, spec.md, data-model.md, research.md:
+     - If FILE_CONTENTS[filename] exists and is NOT `"NOT_FOUND"` or `"TOO_LARGE"`: Use the pre-loaded content
+     - If FILE_CONTENTS[filename] is `"TOO_LARGE"`: Use Read tool to load the file
+     - If FILE_CONTENTS[filename] is `"NOT_FOUND"`: Skip this file
+     - If FILE_CONTENTS field is not present: Use Read tool (backwards compatibility)
+
+   **Always use Read/Glob for these** (not pre-loaded):
+   - contracts/ (always use Glob tool)
+   - quickstart.md (always use Read tool)
+
+   **Required files**: plan.md (tech stack, libraries, structure), spec.md (user stories with priorities)
+   **Optional files**: data-model.md (entities), contracts/ (API endpoints), research.md (decisions), quickstart.md (test scenarios)
+   Note: Not all projects have all documents. Generate tasks based on what's available.
+
+4. **Execute task generation workflow**:
    - Load plan.md and extract tech stack, libraries, project structure
    - Load spec.md and extract user stories with their priorities (P1, P2, P3, etc.)
+   - **If `--stories` flag provided** (T055-T056):
+     - Parse story IDs from flag (e.g., "US1,US2" → ["US1", "US2"])
+     - Validate each story ID exists in spec.md (T055)
+     - Filter user stories to only include requested IDs (T056)
+   - **If `--stories` flag NOT provided**: Use all user stories from spec.md
    - If data-model.md exists: Extract entities and map to user stories
    - If contracts/ exists: Map endpoints to user stories
    - If research.md exists: Extract decisions for setup tasks
+   - **Task generation strategy** (T057):
+     - If `--stories` flag used: Skip Setup/Foundational phases, generate only requested story tasks
+     - If `--stories` flag NOT used: Generate all phases (Setup, Foundational, all user stories, Polish)
    - Generate tasks organized by user story (see Task Generation Rules below)
    - Generate dependency graph showing user story completion order
    - Create parallel execution examples per user story
    - Validate task completeness (each user story has all needed tasks, independently testable)
 
-4. **Generate tasks.md**: Use `$PLUGIN_ROOT/templates/tasks-template.md` as structure, fill with:
+5. **Generate tasks.md** (T058): Use `$PLUGIN_ROOT/templates/tasks-template.md` as structure, fill with:
+   - **Output file path**:
+     - If `--branch` flag provided: `FEATURE_DIR/tasks-<branch-name>.md`
+     - If `--branch` flag NOT provided: `FEATURE_DIR/tasks.md` (default)
    - Correct feature name from plan.md
    - Phase 1: Setup tasks (project initialization)
    - Phase 2: Foundational tasks (blocking prerequisites for all user stories)
@@ -62,7 +112,10 @@ Store this value and use `$PLUGIN_ROOT` in all subsequent script paths (e.g., `b
    - Parallel execution examples per story
    - Implementation strategy section (MVP first, incremental delivery)
 
-5. **Report**: Output path to generated tasks.md and summary:
+6. **Report** (T059): Output path to generated tasks.md and summary:
+   - File path (either `tasks.md` or `tasks-<branch-name>.md`)
+   - If `--branch` flag used: Display branch name and spec ID
+   - If `--stories` flag used: Display filtered story IDs
    - Total task count
    - Task count per user story
    - Parallel opportunities identified

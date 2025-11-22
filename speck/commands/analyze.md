@@ -10,16 +10,6 @@ $ARGUMENTS
 
 You **MUST** consider the user input before proceeding (if not empty).
 
-## Plugin Path Setup
-
-Before proceeding, determine the plugin root path by running:
-
-```bash
-cat "$HOME/.claude/speck-plugin-path" 2>/dev/null || echo ".speck"
-```
-
-Store this value and use `$PLUGIN_ROOT` in all subsequent script paths (e.g., `bun run $PLUGIN_ROOT/scripts/...`).
-
 ## Goal
 
 Identify inconsistencies, duplications, ambiguities, and underspecified items across the three core artifacts (`spec.md`, `plan.md`, `tasks.md`) before implementation. This command MUST run only after `/speck:tasks` has successfully produced a complete `tasks.md`.
@@ -28,22 +18,42 @@ Identify inconsistencies, duplications, ambiguities, and underspecified items ac
 
 **STRICTLY READ-ONLY**: Do **not** modify any files. Output a structured analysis report. Offer an optional remediation plan (user must explicitly approve before any follow-up editing commands would be invoked manually).
 
-**Constitution Authority**: The project constitution (`$PLUGIN_ROOT/memory/constitution.md`) is **non-negotiable** within this analysis scope. Constitution conflicts are automatically CRITICAL and require adjustment of the spec, plan, or tasks—not dilution, reinterpretation, or silent ignoring of the principle. If a principle itself needs to change, that must occur in a separate, explicit constitution update outside `/speck:analyze`.
+**Constitution Authority**: The project constitution (`.speck/memory/constitution.md`) is **non-negotiable** within this analysis scope. Constitution conflicts are automatically CRITICAL and require adjustment of the spec, plan, or tasks—not dilution, reinterpretation, or silent ignoring of the principle. If a principle itself needs to change, that must occur in a separate, explicit constitution update outside `/speck:analyze`.
 
 ## Execution Steps
 
 ### 1. Initialize Analysis Context
 
-Run `bun run $PLUGIN_ROOT/scripts/check-prerequisites.ts --json --require-tasks --include-tasks` once from repo root and parse JSON for FEATURE_DIR and AVAILABLE_DOCS. Derive absolute paths:
+Extract prerequisite context from the auto-injected comment in the prompt:
+```
+<!-- SPECK_PREREQ_CONTEXT
+{"MODE":"single-repo","FEATURE_DIR":"/path/to/specs/010-feature","AVAILABLE_DOCS":["spec.md","plan.md","tasks.md"],"FILE_CONTENTS":{"spec.md":"...","plan.md":"...","tasks.md":"...","constitution.md":"..."}}
+-->
+```
+Use FEATURE_DIR and FILE_CONTENTS from this JSON. All paths are absolute.
 
-- SPEC = FEATURE_DIR/spec.md
-- PLAN = FEATURE_DIR/plan.md
-- TASKS = FEATURE_DIR/tasks.md
+**FILE_CONTENTS field**: Contains pre-loaded file contents for required files. Possible values:
+- Full file content (string): File was successfully pre-loaded
+- `"NOT_FOUND"`: File does not exist (abort with error)
+- `"TOO_LARGE"`: File exceeds size limits (use Read tool instead)
+
+Pre-loaded files: `spec.md`, `plan.md`, `tasks.md`, `constitution.md`
+
+**Fallback**: If the comment is not present (backwards compatibility), run:
+```bash
+speck-check-prerequisites --json --require-tasks --include-tasks
+```
 
 Abort with an error message if any required file is missing (instruct the user to run missing prerequisite command).
-For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\''m Groot' (or double-quote if possible: "I'm Groot").
 
 ### 2. Load Artifacts (Progressive Disclosure)
+
+**Check FILE_CONTENTS from prerequisite context first** (step 1):
+- For spec.md, plan.md, tasks.md, constitution.md:
+  - If FILE_CONTENTS[filename] exists and is NOT `"NOT_FOUND"` or `"TOO_LARGE"`: Use the pre-loaded content
+  - If FILE_CONTENTS[filename] is `"TOO_LARGE"`: Use Read tool to load the file
+  - If FILE_CONTENTS[filename] is `"NOT_FOUND"`: Abort with error (file is required)
+  - If FILE_CONTENTS field is not present: Use Read tool (backwards compatibility)
 
 Load only the minimal necessary context from each artifact:
 
@@ -70,9 +80,9 @@ Load only the minimal necessary context from each artifact:
 - Parallel markers [P]
 - Referenced file paths
 
-**From constitution:**
+**From constitution.md:**
 
-- Load `$PLUGIN_ROOT/memory/constitution.md` for principle validation
+- Principle validation rules
 
 ### 3. Build Semantic Models
 
@@ -171,6 +181,8 @@ At end of report, output a concise Next Actions block:
 ### 8. Offer Remediation
 
 Ask the user: "Would you like me to suggest concrete remediation edits for the top N issues?" (Do NOT apply them automatically.)
+
+**CRITICAL**: If remediation edits are approved and applied, any tasks that are modified with new requirements MUST be unchecked (changed from `[X]` to `[ ]`) in tasks.md so they will be re-implemented with the updated requirements.
 
 ## Operating Principles
 

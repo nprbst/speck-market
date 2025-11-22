@@ -27,10 +27,12 @@
 
 import { existsSync, mkdirSync, copyFileSync } from "node:fs";
 import path from "node:path";
+import { $ } from "bun";
 import {
   getFeaturePaths,
   checkFeatureBranch,
   getTemplatesDir,
+  detectSpeckRoot,
 } from "./common/paths";
 import { ExitCode } from "./contracts/cli-interface";
 
@@ -75,7 +77,7 @@ function showHelp(): void {
 /**
  * Main function
  */
-async function main(args: string[]): Promise<number> {
+export async function main(args: string[]): Promise<number> {
   const options = parseArgs(args);
 
   if (options.help) {
@@ -88,12 +90,83 @@ async function main(args: string[]): Promise<number> {
   const hasGitRepo = paths.HAS_GIT === "true";
 
   // Check if we're on a proper feature branch (only for git repos)
-  if (!checkFeatureBranch(paths.CURRENT_BRANCH, hasGitRepo)) {
+  if (!await checkFeatureBranch(paths.CURRENT_BRANCH, hasGitRepo, paths.REPO_ROOT)) {
     return ExitCode.USER_ERROR;
   }
 
   // Ensure the feature directory exists
   mkdirSync(paths.FEATURE_DIR, { recursive: true });
+
+  // [SPECK-EXTENSION:START] T076-T079: Phase 9 - Branch Management (Multi-Repo)
+  // T076: Create spec-named branch in child repo if not already on that branch
+  const branchName = paths.CURRENT_BRANCH;
+  const config = await detectSpeckRoot();
+
+  if (hasGitRepo) {
+    // Check if we're on the correct branch
+    try {
+      const currentBranch = await $`git rev-parse --abbrev-ref HEAD`.quiet();
+      const currentBranchName = currentBranch.text().trim();
+
+      if (currentBranchName !== branchName) {
+        // Try to checkout or create the branch
+        try {
+          await $`git checkout ${branchName}`.quiet();
+          console.log(`[specify] Checked out branch: ${branchName}`);
+        } catch {
+          // Branch doesn't exist, create it
+          await $`git checkout -b ${branchName}`.quiet();
+          console.log(`[specify] Created and checked out branch: ${branchName}`);
+        }
+      }
+    } catch (error) {
+      console.error(`[specify] Warning: Could not manage git branch: ${String(error)}`);
+    }
+
+    // T077-T079: Validate parent repo is on matching branch when using shared spec
+    // Check if spec is shared (in multi-repo mode, FEATURE_SPEC points to shared spec at speckRoot)
+    // A spec is shared if it exists at the speck root
+    const specFile = paths.FEATURE_SPEC;
+    const isSharedSpec = (config.mode === 'multi-repo' && existsSync(specFile));
+
+    // T077: Validate parent branch if using shared spec in multi-repo mode
+    if (isSharedSpec) {
+      const parentRepoRoot = config.speckRoot;
+
+      // T079: Skip validation if parent is not a git repo
+      let parentHasGit = false;
+      try {
+        const result = await $`git -C ${parentRepoRoot} rev-parse --git-dir`.quiet();
+        if (result.exitCode === 0) {
+          parentHasGit = true;
+        }
+      } catch {
+        // Parent is not a git repo
+      }
+
+      if (parentHasGit) {
+        try {
+          const parentBranch = await $`git -C ${parentRepoRoot} rev-parse --abbrev-ref HEAD`.quiet();
+          const parentBranchName = parentBranch.text().trim();
+
+          if (parentBranchName !== branchName) {
+            // T077: Warn if parent is on different branch
+            console.error(`[specify] Warning: Parent repo branch mismatch!`);
+            console.error(`[specify]   Child repo (current): ${branchName}`);
+            console.error(`[specify]   Parent repo: ${parentBranchName}`);
+            console.error(`[specify]   Parent location: ${parentRepoRoot}`);
+            console.error(`[specify] Consider checking out matching branch in parent:`);
+            console.error(`[specify]   git -C ${parentRepoRoot} checkout ${branchName}`);
+          }
+        } catch (error) {
+          console.error(`[specify] Warning: Could not check parent repo branch: ${String(error)}`);
+        }
+      }
+    }
+    // T078: Skip parent validation when using local (child-only) spec
+    // (handled by if condition above - only validates for shared specs)
+  }
+  // [SPECK-EXTENSION:END]
 
   // Copy plan template if it exists
   const template = path.join(getTemplatesDir(), "plan-template.md");

@@ -59,7 +59,7 @@ export async function readHistory(
 
   try {
     const file = Bun.file(historyPath);
-    const data = await file.json();
+    const data = await file.json() as unknown;
 
     if (!validateHistory(data)) {
       throw new TransformationHistoryError(

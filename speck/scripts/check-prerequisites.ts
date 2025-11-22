@@ -27,7 +27,8 @@
  * - Preserved all CLI flags and exit codes exactly
  */
 
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   getFeaturePaths,
   checkFeatureBranch,
@@ -45,13 +46,19 @@ interface CheckPrerequisitesOptions {
   requireTasks: boolean;
   includeTasks: boolean;
   pathsOnly: boolean;
+  skipFeatureCheck: boolean;
+  skipPlanCheck: boolean;
   help: boolean;
+  includeFileContents: boolean;
+  includeWorkflowMode: boolean;
+  validateCodeQuality: boolean;
 }
 
 /**
  * JSON output for paths-only mode
  */
 interface PathsOnlyOutput {
+  MODE: string;
   REPO_ROOT: string;
   BRANCH: string;
   FEATURE_DIR: string;
@@ -63,9 +70,12 @@ interface PathsOnlyOutput {
 /**
  * JSON output for validation mode
  */
-interface ValidationOutput {
+export interface ValidationOutput {
+  MODE: string;
   FEATURE_DIR: string;
   AVAILABLE_DOCS: string[];
+  FILE_CONTENTS?: Record<string, string>;
+  WORKFLOW_MODE?: string;
 }
 
 /**
@@ -77,7 +87,12 @@ function parseArgs(args: string[]): CheckPrerequisitesOptions {
     requireTasks: args.includes("--require-tasks"),
     includeTasks: args.includes("--include-tasks"),
     pathsOnly: args.includes("--paths-only"),
+    skipFeatureCheck: args.includes("--skip-feature-check"),
+    skipPlanCheck: args.includes("--skip-plan-check"),
     help: args.includes("--help") || args.includes("-h"),
+    includeFileContents: args.includes("--include-file-contents"),
+    includeWorkflowMode: args.includes("--include-workflow-mode"),
+    validateCodeQuality: args.includes("--validate-code-quality"),
   };
 }
 
@@ -85,26 +100,34 @@ function parseArgs(args: string[]): CheckPrerequisitesOptions {
  * Show help message
  */
 function showHelp(): void {
-  console.log(`Usage: check-prerequisites.sh [OPTIONS]
+  console.log(`Usage: check-prerequisites.ts [OPTIONS]
 
 Consolidated prerequisite checking for Spec-Driven Development workflow.
 
 OPTIONS:
-  --json              Output in JSON format
-  --require-tasks     Require tasks.md to exist (for implementation phase)
-  --include-tasks     Include tasks.md in AVAILABLE_DOCS list
-  --paths-only        Only output path variables (no prerequisite validation)
-  --help, -h          Show this help message
+  --json                   Output in JSON format
+  --require-tasks          Require tasks.md to exist (for implementation phase)
+  --include-tasks          Include tasks.md in AVAILABLE_DOCS list
+  --paths-only             Only output path variables (no prerequisite validation)
+  --skip-feature-check     Skip feature directory and plan.md validation (for /speck.specify)
+  --skip-plan-check        Skip plan.md validation but check feature directory (for /speck.plan)
+  --validate-code-quality  Validate TypeScript typecheck and ESLint (Constitution Principle IX)
+  --include-file-contents  Include file contents in JSON output
+  --include-workflow-mode  Include workflow mode in JSON output
+  --help, -h               Show this help message
 
 EXAMPLES:
   # Check task prerequisites (plan.md required)
-  ./check-prerequisites.sh --json
+  bun .speck/scripts/check-prerequisites.ts --json
 
   # Check implementation prerequisites (plan.md + tasks.md required)
-  ./check-prerequisites.sh --json --require-tasks --include-tasks
+  bun .speck/scripts/check-prerequisites.ts --json --require-tasks --include-tasks
+
+  # Validate code quality before feature completion
+  bun .speck/scripts/check-prerequisites.ts --validate-code-quality
 
   # Get feature paths only (no validation)
-  ./check-prerequisites.sh --paths-only
+  bun .speck/scripts/check-prerequisites.ts --paths-only
 `);
 }
 
@@ -114,6 +137,7 @@ EXAMPLES:
 function outputPathsOnly(paths: FeaturePaths, jsonMode: boolean): void {
   if (jsonMode) {
     const output: PathsOnlyOutput = {
+      MODE: paths.MODE,
       REPO_ROOT: paths.REPO_ROOT,
       BRANCH: paths.CURRENT_BRANCH,
       FEATURE_DIR: paths.FEATURE_DIR,
@@ -123,6 +147,7 @@ function outputPathsOnly(paths: FeaturePaths, jsonMode: boolean): void {
     };
     console.log(JSON.stringify(output));
   } else {
+    console.log(`MODE: ${paths.MODE}`);
     console.log(`REPO_ROOT: ${paths.REPO_ROOT}`);
     console.log(`BRANCH: ${paths.CURRENT_BRANCH}`);
     console.log(`FEATURE_DIR: ${paths.FEATURE_DIR}`);
@@ -136,7 +161,19 @@ function outputPathsOnly(paths: FeaturePaths, jsonMode: boolean): void {
  * Check for unknown options
  */
 function checkForUnknownOptions(args: string[]): void {
-  const validOptions = ["--json", "--require-tasks", "--include-tasks", "--paths-only", "--help", "-h"];
+  const validOptions = [
+    "--json",
+    "--require-tasks",
+    "--include-tasks",
+    "--paths-only",
+    "--skip-feature-check",
+    "--skip-plan-check",
+    "--help",
+    "-h",
+    "--include-file-contents",
+    "--include-workflow-mode",
+    "--validate-code-quality"
+  ];
   for (const arg of args) {
     if (arg.startsWith("--") || arg.startsWith("-")) {
       if (!validOptions.includes(arg)) {
@@ -148,9 +185,133 @@ function checkForUnknownOptions(args: string[]): void {
 }
 
 /**
+ * File size limits for pre-loading
+ */
+const FILE_SIZE_LIMITS = {
+  maxSingleFile: 24 * 1024, // 24KB per file
+  maxTotalFiles: 100 * 1024, // 100KB total
+};
+
+/**
+ * Load file content with size checking
+ *
+ * @param filePath - Absolute path to file
+ * @param totalSize - Running total of loaded file sizes
+ * @returns File content or status indicator ("NOT_FOUND" or "TOO_LARGE")
+ */
+function loadFileContent(filePath: string, totalSize: { value: number }): string {
+  if (!existsSync(filePath)) {
+    return "NOT_FOUND";
+  }
+
+  try {
+    const stats = Bun.file(filePath);
+    const fileSize = stats.size;
+
+    // Check single file size limit
+    if (fileSize > FILE_SIZE_LIMITS.maxSingleFile) {
+      return "TOO_LARGE";
+    }
+
+    // Check total size limit
+    if (totalSize.value + fileSize > FILE_SIZE_LIMITS.maxTotalFiles) {
+      return "TOO_LARGE";
+    }
+
+    // Read file content
+    const content = readFileSync(filePath, "utf-8");
+    totalSize.value += fileSize;
+    return content;
+  } catch (error) {
+    return "NOT_FOUND";
+  }
+}
+
+/**
+ * Validate code quality (Constitution Principle IX)
+ *
+ * Runs typecheck and lint to ensure zero errors and warnings.
+ * Returns error message if validation fails, null if passes.
+ */
+async function validateCodeQuality(repoRoot: string): Promise<{ passed: boolean; message: string }> {
+  const { $ } = await import("bun");
+
+  // Run typecheck
+  const typecheckResult = await $`bun run typecheck`.cwd(repoRoot).nothrow().quiet();
+  if (typecheckResult.exitCode !== 0) {
+    return {
+      passed: false,
+      message: `❌ TypeScript validation failed (exit code ${typecheckResult.exitCode})\n${typecheckResult.stderr.toString()}`
+    };
+  }
+
+  // Run lint
+  const lintResult = await $`bun run lint`.cwd(repoRoot).nothrow().quiet();
+  if (lintResult.exitCode !== 0) {
+    const output = lintResult.stdout.toString();
+    return {
+      passed: false,
+      message: `❌ ESLint validation failed (exit code ${lintResult.exitCode})\n${output}`
+    };
+  }
+
+  return {
+    passed: true,
+    message: "✅ Code quality validation passed (0 typecheck errors, 0 lint errors/warnings)"
+  };
+}
+
+/**
+ * Determine workflow mode from plan.md, constitution.md, or default
+ *
+ * @param featureDir - Absolute path to feature directory
+ * @param repoRoot - Absolute path to repository root
+ * @returns Workflow mode: "stacked-pr" or "single-branch"
+ */
+function determineWorkflowMode(featureDir: string, repoRoot: string): string {
+  // First, check plan.md
+  const planPath = join(featureDir, "plan.md");
+  if (existsSync(planPath)) {
+    try {
+      const planContent = readFileSync(planPath, "utf-8");
+      const workflowMatch = planContent.match(/\*\*Workflow Mode\*\*:\s*(stacked-pr|single-branch)/);
+      if (workflowMatch && workflowMatch[1]) {
+        return workflowMatch[1];
+      }
+    } catch {
+      // Continue to next fallback
+    }
+  }
+
+  // Second, check constitution.md
+  const constitutionPath = join(repoRoot, ".speck", "memory", "constitution.md");
+  if (existsSync(constitutionPath)) {
+    try {
+      const constitutionContent = readFileSync(constitutionPath, "utf-8");
+      const workflowMatch = constitutionContent.match(/\*\*Default Workflow Mode\*\*:\s*(stacked-pr|single-branch)/);
+      if (workflowMatch && workflowMatch[1]) {
+        return workflowMatch[1];
+      }
+    } catch {
+      // Continue to default
+    }
+  }
+
+  // Default
+  return "single-branch";
+}
+
+/**
  * Main function
  */
-async function main(args: string[]): Promise<number> {
+export async function main(args: string[]): Promise<number> {
+  // DEPRECATION WARNING: This individual script is deprecated
+  // Prerequisite checks are now automatically performed by PrePromptSubmit hook
+  // For manual checks, use: bun .speck/scripts/speck.ts env
+  if (!args.includes("--json") && process.stdout.isTTY) {
+    console.warn("\x1b[33m⚠️  DEPRECATION WARNING: Direct invocation deprecated. Prerequisites are now auto-checked via PrePromptSubmit hook.\x1b[0m\n");
+  }
+
   // Check for unknown options first
   checkForUnknownOptions(args);
 
@@ -165,12 +326,15 @@ async function main(args: string[]): Promise<number> {
   const paths = await getFeaturePaths();
   const hasGitRepo = paths.HAS_GIT === "true";
 
-  if (!checkFeatureBranch(paths.CURRENT_BRANCH, hasGitRepo)) {
-    return ExitCode.USER_ERROR;
+  // Skip branch validation if --skip-feature-check is set
+  if (!options.skipFeatureCheck) {
+    if (!(await checkFeatureBranch(paths.CURRENT_BRANCH, hasGitRepo, paths.REPO_ROOT))) {
+      return ExitCode.USER_ERROR;
+    }
   }
 
-  // If paths-only mode, output paths and exit
-  if (options.pathsOnly) {
+  // If paths-only mode OR skip-feature-check mode, output paths and exit
+  if (options.pathsOnly || options.skipFeatureCheck) {
     outputPathsOnly(paths, options.json);
     return ExitCode.SUCCESS;
   }
@@ -178,20 +342,21 @@ async function main(args: string[]): Promise<number> {
   // Validate required directories and files
   if (!existsSync(paths.FEATURE_DIR)) {
     console.error(`ERROR: Feature directory not found: ${paths.FEATURE_DIR}`);
-    console.error("Run /speckit.specify first to create the feature structure.");
+    console.error("Run /speck.specify first to create the feature structure.");
     return ExitCode.USER_ERROR;
   }
 
-  if (!existsSync(paths.IMPL_PLAN)) {
+  // Check plan.md unless --skip-plan-check is set
+  if (!options.skipPlanCheck && !existsSync(paths.IMPL_PLAN)) {
     console.error(`ERROR: plan.md not found in ${paths.FEATURE_DIR}`);
-    console.error("Run /speckit.plan first to create the implementation plan.");
+    console.error("Run /speck.plan first to create the implementation plan.");
     return ExitCode.USER_ERROR;
   }
 
   // Check for tasks.md if required
   if (options.requireTasks && !existsSync(paths.TASKS)) {
     console.error(`ERROR: tasks.md not found in ${paths.FEATURE_DIR}`);
-    console.error("Run /speckit.tasks first to create the task list.");
+    console.error("Run /speck.tasks first to create the task list.");
     return ExitCode.USER_ERROR;
   }
 
@@ -228,11 +393,66 @@ async function main(args: string[]): Promise<number> {
     docs.push("tasks.md");
   }
 
+  // Load file contents if requested
+  let fileContents: Record<string, string> | undefined;
+  if (options.includeFileContents) {
+    fileContents = {};
+    const totalSize = { value: 0 };
+
+    // High priority files (always attempt)
+    fileContents["tasks.md"] = loadFileContent(paths.TASKS, totalSize);
+    fileContents["plan.md"] = loadFileContent(paths.IMPL_PLAN, totalSize);
+    fileContents["spec.md"] = loadFileContent(paths.FEATURE_SPEC, totalSize);
+
+    // Medium priority files (always attempt)
+    const constitutionPath = join(paths.REPO_ROOT, ".speck", "memory", "constitution.md");
+    fileContents["constitution.md"] = loadFileContent(constitutionPath, totalSize);
+    fileContents["data-model.md"] = loadFileContent(paths.DATA_MODEL, totalSize);
+    fileContents["research.md"] = loadFileContent(paths.RESEARCH, totalSize);
+
+    // Load checklist files (if checklists/ directory exists)
+    const checklistsDir = join(paths.FEATURE_DIR, "checklists");
+    if (existsSync(checklistsDir)) {
+      try {
+        const checklistFiles = readdirSync(checklistsDir).filter(f => f.endsWith(".md"));
+        for (const file of checklistFiles) {
+          const checklistPath = join(checklistsDir, file);
+          fileContents[`checklists/${file}`] = loadFileContent(checklistPath, totalSize);
+        }
+      } catch {
+        // Directory not readable or error reading files, skip
+      }
+    }
+  }
+
+  // Determine workflow mode if requested
+  let workflowMode: string | undefined;
+  if (options.includeWorkflowMode) {
+    workflowMode = determineWorkflowMode(paths.FEATURE_DIR, paths.REPO_ROOT);
+  }
+
+  // Validate code quality if requested (Constitution Principle IX)
+  if (options.validateCodeQuality) {
+    const qualityResult = await validateCodeQuality(paths.REPO_ROOT);
+    if (!qualityResult.passed) {
+      console.error("\n" + qualityResult.message);
+      console.error("\nConstitution Principle IX requires zero typecheck errors and zero lint errors/warnings.");
+      console.error("Fix all issues before marking the feature complete.\n");
+      return ExitCode.USER_ERROR;
+    }
+    if (!options.json) {
+      console.log("\n" + qualityResult.message + "\n");
+    }
+  }
+
   // Output results
   if (options.json) {
     const output: ValidationOutput = {
+      MODE: paths.MODE,
       FEATURE_DIR: paths.FEATURE_DIR,
       AVAILABLE_DOCS: docs,
+      ...(fileContents && { FILE_CONTENTS: fileContents }),
+      ...(workflowMode && { WORKFLOW_MODE: workflowMode }),
     };
     console.log(JSON.stringify(output));
   } else {

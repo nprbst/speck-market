@@ -31,21 +31,27 @@ $ARGUMENTS
 
 You **MUST** consider the user input before proceeding (if not empty).
 
-## Plugin Path Setup
-
-Before proceeding, determine the plugin root path by running:
-
-```bash
-cat "$HOME/.claude/speck-plugin-path" 2>/dev/null || echo ".speck"
-```
-
-Store this value and use `$PLUGIN_ROOT` in all subsequent script paths (e.g., `bun run $PLUGIN_ROOT/scripts/...`).
-
 ## Execution Steps
 
-1. **Setup**: Run `bun run $PLUGIN_ROOT/scripts/check-prerequisites.ts --json` from repo root and parse JSON for FEATURE_DIR and AVAILABLE_DOCS list.
-   - All file paths must be absolute.
-   - For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\''m Groot' (or double-quote if possible: "I'm Groot").
+1. **Setup**: Extract prerequisite context from the auto-injected comment in the prompt:
+   ```
+   <!-- SPECK_PREREQ_CONTEXT
+   {"MODE":"single-repo","FEATURE_DIR":"/path/to/specs/010-feature","AVAILABLE_DOCS":["spec.md","plan.md"],"FILE_CONTENTS":{"spec.md":"...","plan.md":"...","tasks.md":"..."}}
+   -->
+   ```
+   Use the FEATURE_DIR, AVAILABLE_DOCS, and FILE_CONTENTS values from this JSON. All paths are absolute.
+
+   **FILE_CONTENTS field**: Contains pre-loaded file contents. Possible values:
+   - Full file content (string): File was successfully pre-loaded
+   - `"NOT_FOUND"`: File does not exist
+   - `"TOO_LARGE"`: File exceeds size limits (use Read tool instead)
+
+   Pre-loaded files: `spec.md`, `plan.md`, `tasks.md`
+
+   **Fallback**: If the comment is not present (backwards compatibility), run:
+   ```bash
+   speck-check-prerequisites --json
+   ```
 
 2. **Clarify intent (dynamic)**: Derive up to THREE initial contextual clarifying questions (no pre-baked catalog). They MUST:
    - Be generated from the user's phrasing + extracted signals from spec/plan/tasks
@@ -86,6 +92,14 @@ Store this value and use `$PLUGIN_ROOT` in all subsequent script paths (e.g., `b
    - Infer any missing context from spec/plan/tasks (do NOT hallucinate)
 
 4. **Load feature context**: Read from FEATURE_DIR:
+   **Check FILE_CONTENTS from prerequisite context first** (step 1):
+   - For spec.md, plan.md, tasks.md:
+     - If FILE_CONTENTS[filename] exists and is NOT `"NOT_FOUND"` or `"TOO_LARGE"`: Use the pre-loaded content
+     - If FILE_CONTENTS[filename] is `"TOO_LARGE"`: Use Read tool to load the file
+     - If FILE_CONTENTS[filename] is `"NOT_FOUND"`: Skip this file
+     - If FILE_CONTENTS field is not present: Use Read tool (backwards compatibility)
+
+   Files to load:
    - spec.md: Feature requirements and scope
    - plan.md (if exists): Technical details, dependencies
    - tasks.md (if exists): Implementation tasks

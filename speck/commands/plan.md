@@ -18,24 +18,66 @@ $ARGUMENTS
 
 You **MUST** consider the user input before proceeding (if not empty).
 
-## Plugin Path Setup
+## Workflow Mode Detection
 
-Before proceeding, determine the plugin root path by running:
-
-```bash
-cat "$HOME/.claude/speck-plugin-path" 2>/dev/null || echo ".speck"
-```
-
-Store this value and use `$PLUGIN_ROOT` in all subsequent script paths (e.g., `bun run $PLUGIN_ROOT/scripts/...`).
+Parse command-line flags from user input:
+- `--stacked`: Enable stacked PR workflow mode (write workflow metadata to plan.md)
+- If no flag provided: Default to single-branch mode (no workflow metadata written)
 
 ## Outline
 
-1. **Setup**: Run `bun run $PLUGIN_ROOT/scripts/setup-plan.ts --json` from repo root and parse JSON for FEATURE_SPEC, IMPL_PLAN, SPECS_DIR, BRANCH. For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\''m Groot' (or double-quote if possible: "I'm Groot").
+1. **Setup**: Extract prerequisite context from the auto-injected comment in the prompt:
+   ```
+   <!-- SPECK_PREREQ_CONTEXT
+   {"MODE":"single-repo","FEATURE_DIR":"/path/to/specs/010-feature","AVAILABLE_DOCS":["spec.md"],"FILE_CONTENTS":{"spec.md":"...","constitution.md":"..."}}
+   -->
+   ```
+   Use FEATURE_DIR and FILE_CONTENTS from this JSON.
 
-2. **Load context**: Read FEATURE_SPEC and `$PLUGIN_ROOT/memory/constitution.md`. Load IMPL_PLAN template (already copied).
+   **FILE_CONTENTS field**: Contains pre-loaded file contents. Possible values:
+   - Full file content (string): File was successfully pre-loaded
+   - `"NOT_FOUND"`: File does not exist
+   - `"TOO_LARGE"`: File exceeds size limits (use Read tool instead)
+
+   Pre-loaded files: `spec.md`, `constitution.md`
+
+   **Check FILE_CONTENTS from prerequisite context first**:
+   - For spec.md, constitution.md:
+     - If FILE_CONTENTS[filename] exists and is NOT `"NOT_FOUND"` or `"TOO_LARGE"`: Use the pre-loaded content
+     - If FILE_CONTENTS[filename] is `"TOO_LARGE"`: Use Read tool to load the file
+     - If FILE_CONTENTS[filename] is `"NOT_FOUND"`: Skip this file (error if required)
+     - If FILE_CONTENTS field is not present: Use Read tool (backwards compatibility)
+
+   **Fallback**: If the comment is not present (backwards compatibility), run:
+   ```bash
+   speck-setup-plan --json
+   ```
+   Parse JSON for FEATURE_SPEC, IMPL_PLAN, SPECS_DIR, BRANCH.
+
+2. **Load context**:
+   - Read spec.md from FILE_CONTENTS (step 1) or using Read tool if needed
+   - Read constitution.md from FILE_CONTENTS (step 1) or using Read tool if needed
+   - Load plan.md template (always use Read - not pre-loaded)
 
 3. **Execute plan workflow**: Follow the structure in IMPL_PLAN template to:
    - Fill Technical Context (mark unknowns as "NEEDS CLARIFICATION")
+   - **If --stacked flag provided**: Add workflow mode metadata to plan.md header
+     - After the "Feature Branch:", "Spec:", "Status:", "Created:" lines in plan.md header
+     - Insert line: `**Workflow Mode**: stacked-pr`
+     - Analyze user stories in spec.md to suggest groupings:
+       - Group related user stories that could be implemented in sequence
+       - Example: US1,US2 (database layer) → US3,US4 (API layer) → US5,US6 (UI layer)
+     - Add section to plan.md (after Executive Summary):
+       ```markdown
+       ## User Story Groupings
+
+       **Suggested Stacking Strategy**:
+       - Branch 1: US1, US2 (Database layer)
+       - Branch 2: US3, US4 (API endpoints)
+       - Branch 3: US5, US6 (UI components)
+
+       These groupings represent natural boundaries for stacked PRs. Each group can be implemented in a separate branch with its own pull request.
+       ```
    - Fill Constitution Check section from constitution
    - Evaluate gates (ERROR if violations unjustified)
    - Phase 0: Generate research.md (resolve all NEEDS CLARIFICATION)
@@ -85,7 +127,7 @@ Store this value and use `$PLUGIN_ROOT` in all subsequent script paths (e.g., `b
    - Output OpenAPI/GraphQL schema to `/contracts/`
 
 3. **Agent context update**:
-   - Run `bun run $PLUGIN_ROOT/scripts/update-agent-context.ts claude`
+   - Run `speck-update-agent-context claude`
    - These scripts detect which AI agent is in use
    - Update the appropriate agent-specific context file
    - Add only new technology from current plan

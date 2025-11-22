@@ -43,7 +43,7 @@ export async function readRegistry(
 
   try {
     const file = Bun.file(registryPath);
-    const data = await file.json();
+    const data = await file.json() as unknown;
     return validateReleaseRegistry(data);
   } catch (error) {
     if (error instanceof ReleaseRegistryError) {

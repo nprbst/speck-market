@@ -1,7 +1,7 @@
 {
   "name": "speck",
   "description": "Specification and planning workflow framework for Claude Code",
-  "version": "1.5.4",
+  "version": "1.6.0",
   "author": {
     "name": "Nathan Prabst",
     "email": "nathan@example.com"
@@ -15,5 +15,12 @@
     "workflow",
     "feature-management",
     "development-tools"
-  ]
+  ],
+  "hooks": {
+    "PreToolUse": {
+      "Bash": {
+        "command": "bun dist/speck-hook.js --hook"
+      }
+    }
+  }
 }

@@ -81,11 +81,11 @@ export async function removeDirectory(
  * await atomicMove("/tmp/speck-temp-abc123", ".speck/scripts");
  * ```
  */
-export async function atomicMove(
+export function atomicMove(
   sourcePath: string,
   destPath: string,
   removeExisting = false
-): Promise<void> {
+): void {
   try {
     // Check if destination exists
     if (existsSync(destPath)) {

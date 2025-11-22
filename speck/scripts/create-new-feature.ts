@@ -26,11 +26,11 @@
  * - Preserved all CLI flags and argument parsing logic
  */
 
-import { existsSync, mkdirSync, readdirSync, copyFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, copyFileSync, symlinkSync } from "node:fs";
 import path from "node:path";
 import { $ } from "bun";
 import { ExitCode } from "./contracts/cli-interface";
-import { getTemplatesDir } from "./common/paths";
+import { getTemplatesDir, detectSpeckRoot } from "./common/paths";
 
 /**
  * CLI options for create-new-feature
@@ -39,6 +39,8 @@ interface CreateFeatureOptions {
   json: boolean;
   shortName?: string;
   number?: number;
+  sharedSpec: boolean;  // T064-T066: Create spec at speckRoot with local symlinks
+  localSpec: boolean;   // T067: Create spec locally in child repo
   help: boolean;
   featureDescription: string;
 }
@@ -58,6 +60,8 @@ interface CreateFeatureOutput {
 function parseArgs(args: string[]): CreateFeatureOptions {
   const options: CreateFeatureOptions = {
     json: false,
+    sharedSpec: false,
+    localSpec: false,
     help: false,
     featureDescription: "",
   };
@@ -66,30 +70,36 @@ function parseArgs(args: string[]): CreateFeatureOptions {
   let i = 0;
 
   while (i < args.length) {
-    const arg = args[i];
+    const arg = args[i]!;
 
     if (arg === "--json") {
       options.json = true;
       i++;
     } else if (arg === "--short-name") {
-      if (i + 1 >= args.length || args[i + 1].startsWith("--")) {
+      if (i + 1 >= args.length || args[i + 1]?.startsWith("--")) {
         console.error("Error: --short-name requires a value");
         process.exit(ExitCode.USER_ERROR);
       }
-      options.shortName = args[i + 1];
+      options.shortName = args[i + 1]!;
       i += 2;
     } else if (arg === "--number") {
-      if (i + 1 >= args.length || args[i + 1].startsWith("--")) {
+      if (i + 1 >= args.length || args[i + 1]?.startsWith("--")) {
         console.error("Error: --number requires a value");
         process.exit(ExitCode.USER_ERROR);
       }
-      const num = parseInt(args[i + 1], 10);
+      const num = parseInt(args[i + 1]!, 10);
       if (isNaN(num)) {
         console.error("Error: --number requires a numeric value");
         process.exit(ExitCode.USER_ERROR);
       }
       options.number = num;
       i += 2;
+    } else if (arg === "--shared-spec") {
+      options.sharedSpec = true;
+      i++;
+    } else if (arg === "--local-spec") {
+      options.localSpec = true;
+      i++;
     } else if (arg === "--help" || arg === "-h") {
       options.help = true;
       i++;
@@ -107,18 +117,20 @@ function parseArgs(args: string[]): CreateFeatureOptions {
  * Show help message
  */
 function showHelp(): void {
-  const scriptName = path.basename(process.argv[1]);
-  console.log(`Usage: ${scriptName} [--json] [--short-name <name>] [--number N] <feature_description>
+  const scriptName = path.basename(process.argv[1]!);
+  console.log(`Usage: ${scriptName} [--json] [--short-name <name>] [--number N] [--shared-spec | --local-spec] <feature_description>
 
 Options:
   --json              Output in JSON format
   --short-name <name> Provide a custom short name (2-4 words) for the branch
   --number N          Specify branch number manually (overrides auto-detection)
+  --shared-spec       Create spec at speckRoot (multi-repo shared spec with local symlinks)
+  --local-spec        Create spec locally in child repo (single-repo or child-only spec)
   --help, -h          Show this help message
 
 Examples:
   ${scriptName} 'Add user authentication system' --short-name 'user-auth'
-  ${scriptName} 'Implement OAuth2 integration for API' --number 5`);
+  ${scriptName} 'Implement OAuth2 integration for API' --number 5 --shared-spec`);
 }
 
 /**
@@ -146,7 +158,7 @@ function getHighestFromSpecs(specsDir: string): number {
     for (const dir of dirs) {
       if (dir.isDirectory()) {
         const match = dir.name.match(/^(\d+)/);
-        if (match) {
+        if (match && match[1]) {
           const num = parseInt(match[1], 10);
           if (num > highest) {
             highest = num;
@@ -154,38 +166,6 @@ function getHighestFromSpecs(specsDir: string): number {
         }
       }
     }
-  }
-
-  return highest;
-}
-
-/**
- * Get highest number from git branches
- */
-async function getHighestFromBranches(): Promise<number> {
-  let highest = 0;
-
-  try {
-    const result = await $`git branch -a`.quiet();
-    const branches = result.text().split("\n");
-
-    for (const branch of branches) {
-      // Clean branch name: remove leading markers and remote prefixes
-      const cleanBranch = branch
-        .replace(/^[* ]+/, "")
-        .replace(/^remotes\/[^/]+\//, "");
-
-      // Extract feature number if branch matches pattern ###-*
-      const match = cleanBranch.match(/^(\d{3})-/);
-      if (match) {
-        const num = parseInt(match[1], 10);
-        if (num > highest) {
-          highest = num;
-        }
-      }
-    }
-  } catch {
-    // Git not available or no branches
   }
 
   return highest;
@@ -210,7 +190,7 @@ async function checkExistingBranches(shortName: string, specsDir: string): Promi
     const lines = result.text().split("\n");
     for (const line of lines) {
       const match = line.match(new RegExp(`refs/heads/(\\d+)-${shortName}$`));
-      if (match) {
+      if (match && match[1]) {
         const num = parseInt(match[1], 10);
         if (num > maxNum) {
           maxNum = num;
@@ -227,7 +207,7 @@ async function checkExistingBranches(shortName: string, specsDir: string): Promi
     const branches = result.text().split("\n");
     for (const branch of branches) {
       const match = branch.match(new RegExp(`^[* ]*?(\\d+)-${shortName}$`));
-      if (match) {
+      if (match && match[1]) {
         const num = parseInt(match[1], 10);
         if (num > maxNum) {
           maxNum = num;
@@ -244,7 +224,7 @@ async function checkExistingBranches(shortName: string, specsDir: string): Promi
     for (const dir of dirs) {
       if (dir.isDirectory()) {
         const match = dir.name.match(new RegExp(`^(\\d+)-${shortName}$`));
-        if (match) {
+        if (match && match[1]) {
           const num = parseInt(match[1], 10);
           if (num > maxNum) {
             maxNum = num;
@@ -323,7 +303,7 @@ function generateBranchName(description: string): string {
 /**
  * Main function
  */
-async function main(args: string[]): Promise<number> {
+export async function main(args: string[]): Promise<number> {
   const options = parseArgs(args);
 
   if (options.help) {
@@ -336,7 +316,7 @@ async function main(args: string[]): Promise<number> {
     return ExitCode.USER_ERROR;
   }
 
-  // Resolve repository root
+  // Resolve repository root and detect multi-repo mode
   let repoRoot: string;
   let hasGit = false;
 
@@ -355,8 +335,22 @@ async function main(args: string[]): Promise<number> {
     hasGit = false;
   }
 
-  const specsDir = path.join(repoRoot, "specs");
+  // [SPECK-EXTENSION:START] T064-T066: Multi-repo shared spec support
+  const config = await detectSpeckRoot();
+
+  // Determine spec location (speckRoot for shared specs, repoRoot for local specs)
+  let specsDir: string;
+  let isSharedSpec = false;
+  if (options.sharedSpec && config.mode === 'multi-repo') {
+    // T064: Create shared spec at speckRoot
+    specsDir = path.join(config.speckRoot, "specs");
+    isSharedSpec = true;
+  } else {
+    // T067: Create local spec at repoRoot (default behavior)
+    specsDir = path.join(repoRoot, "specs");
+  }
   mkdirSync(specsDir, { recursive: true });
+  // [SPECK-EXTENSION:END]
 
   // Generate branch name
   let branchSuffix: string;
@@ -398,18 +392,80 @@ async function main(args: string[]): Promise<number> {
     try {
       await $`git checkout -b ${branchName}`;
     } catch (error) {
-      console.error(`Error: Failed to create git branch: ${error}`);
+      console.error(`Error: Failed to create git branch: ${String(error)}`);
       return ExitCode.USER_ERROR;
     }
   } else {
     console.error(`[specify] Warning: Git repository not detected; skipped branch creation for ${branchName}`);
   }
 
-  // Create feature directory
+  // [SPECK-EXTENSION:START] T073-T075: Phase 9 - Branch Management (Multi-Repo)
+  // T073: Create spec-named branch in parent repo when creating shared spec
+  if (isSharedSpec && config.mode === 'multi-repo') {
+    const parentRepoRoot = config.speckRoot;
+
+    // T074: Check if parent is a git repo; if not, prompt user to initialize
+    let parentHasGit = false;
+    try {
+      const result = await $`git -C ${parentRepoRoot} rev-parse --git-dir`.quiet();
+      if (result.exitCode === 0) {
+        parentHasGit = true;
+      }
+    } catch {
+      // Parent is not a git repo
+    }
+
+    if (!parentHasGit) {
+      // T074: Prompt user to initialize parent as git repo
+      console.error(`[specify] Notice: Parent directory is not a git repository: ${parentRepoRoot}`);
+      console.error(`[specify] To enable branch coordination, initialize it as a git repo:`);
+      console.error(`[specify]   cd ${parentRepoRoot} && git init`);
+      console.error(`[specify] Skipping parent branch creation for now.`);
+    } else {
+      // T073: Create spec-named branch in parent repo
+      try {
+        // Check if branch already exists in parent
+        let branchExistsInParent = false;
+        try {
+          const checkResult = await $`git -C ${parentRepoRoot} rev-parse --verify ${branchName}`.quiet();
+          branchExistsInParent = (checkResult.exitCode === 0);
+        } catch {
+          branchExistsInParent = false;
+        }
+
+        if (branchExistsInParent) {
+          // Branch exists, check it out
+          await $`git -C ${parentRepoRoot} checkout ${branchName}`.quiet();
+          if (!options.json) {
+            console.log(`[specify] Checked out existing branch in parent repo: ${branchName}`);
+          }
+        } else {
+          // Create new branch in parent repo
+          const createResult = await $`git -C ${parentRepoRoot} checkout -b ${branchName}`.quiet();
+          if (createResult.exitCode !== 0) {
+            throw new Error(`git checkout -b failed with exit code ${String(createResult.exitCode)}: ${String(createResult.stderr)}`);
+          }
+          if (!options.json) {
+            console.log(`[specify] Created branch in parent repo: ${branchName}`);
+          }
+        }
+      } catch (error) {
+        console.error(`[specify] Warning: Failed to create branch in parent repo: ${String(error)}`);
+        console.error(`[specify] Parent repo: ${parentRepoRoot}`);
+        console.error(`[specify] You may need to manually create the branch: git -C ${parentRepoRoot} checkout -b ${branchName}`);
+      }
+    }
+  }
+  // T075: Skip parent branch creation when creating local (child-only) spec
+  // (handled by if condition above - only runs for shared specs)
+  // [SPECK-EXTENSION:END]
+
+  // [SPECK-EXTENSION:START] T064-T066: Handle shared vs local spec creation
+  // Create feature directory at the determined location (shared or local)
   const featureDir = path.join(specsDir, branchName);
   mkdirSync(featureDir, { recursive: true });
 
-  // Copy template if it exists
+  // Copy template to the spec location
   const template = path.join(getTemplatesDir(), "spec-template.md");
   const specFile = path.join(featureDir, "spec.md");
   if (existsSync(template)) {
@@ -418,6 +474,40 @@ async function main(args: string[]): Promise<number> {
     // Create empty spec file
     await Bun.write(specFile, "");
   }
+
+  // T065-T066: If shared spec in multi-repo mode, create local directory and symlink
+  if (options.sharedSpec && config.mode === 'multi-repo') {
+    // T065: Create local specs/NNN-feature/ directory in child repo
+    const localFeatureDir = path.join(repoRoot, "specs", branchName);
+    mkdirSync(localFeatureDir, { recursive: true });
+
+    // T066: Symlink parent spec.md into child's local specs/NNN-feature/
+    const localSpecFile = path.join(localFeatureDir, "spec.md");
+
+    // Calculate relative path from local spec location to shared spec
+    const relativePath = path.relative(localFeatureDir, specFile);
+
+    try {
+      symlinkSync(relativePath, localSpecFile, 'file');
+    } catch (error) {
+      const err = error as NodeJS.ErrnoException;
+      if (err.code !== 'EEXIST') {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.error(`Warning: Failed to create symlink for spec.md: ${errorMessage}`);
+        console.error(`  From: ${localSpecFile}`);
+        console.error(`  To: ${specFile}`);
+      }
+    }
+
+    // T069: Symlink contracts/ directory if it exists at shared location
+    // const _sharedContractsDir = path.join(featureDir, "contracts");
+    // const _localContractsLink = path.join(localFeatureDir, "contracts");
+
+    // Note: contracts/ might not exist yet, but we'll check when it gets created
+    // For now, just document that this will be handled by /speck.plan or later commands
+    // Actually, we should add a utility function that can be called to sync contracts/
+  }
+  // [SPECK-EXTENSION:END]
 
   // Set SPECIFY_FEATURE environment variable (note: this only affects this process)
   process.env.SPECIFY_FEATURE = branchName;
