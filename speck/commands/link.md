@@ -47,19 +47,22 @@ After linking, you can:
 
 ## Implementation
 
-After creating the symlink, you MUST update the linked-repos.md file in the Speck root:
+**Path Handling:** If the provided path is relative, prepend `../` before creating the symlink (the symlink lives at `.speck/root`, one level deeper than the repo root). Example: user provides `../../speck-root` → symlink target becomes `../../../speck-root`.
 
-1. Read the current repository name and path
-2. Get today's date for the "Linked" field
-3. Read `<speck-root>/.speck/linked-repos.md`
-4. Add a new entry under the "Active Links" section with:
+**Steps:**
+
+1. Verify the provided path exists (test with `ls <path>`)
+2. If path is relative, prepend `../` to adjust for `.speck/` directory depth
+3. Create symlink: `ln -s <adjusted-path> .speck/root`
+4. Verify symlink works: `ls .speck/root/` should succeed
+5. Get repository info (name from git remote, absolute path, git user, today's date)
+6. Update `<speck-root>/.speck/linked-repos.md` by adding entry under "Active Links" section:
    - Repository name (from git remote or directory name)
    - Full absolute path to this repository
    - Today's date
    - Contact information (git user name or "Unknown")
    - Active features: "None yet"
    - Notes: Brief description of the repository purpose
-5. Write the updated file back
 
 **Example entry format:**
 ```markdown
