@@ -27,6 +27,10 @@ Creates a new branch in the stack with explicit dependency tracking.
 - `<name>` - Branch name (freeform, any valid git ref name)
 - `--base <branch>` - Base branch to stack on (optional, defaults to current branch)
 - `--spec <spec-id>` - Spec ID to link to (optional, auto-detected)
+- `--no-worktree` - Skip worktree creation even if enabled in config (worktree integration, feature 012)
+- `--no-ide` - Skip IDE launch during worktree creation (worktree integration, feature 012)
+- `--no-deps` - Skip dependency installation during worktree creation (worktree integration, feature 012)
+- `--reuse-worktree` - Reuse existing worktree directory if present (worktree integration, feature 012)
 
 **Examples:**
 ```bash
@@ -176,13 +180,39 @@ PR_SUGGESTION=$(echo "$STDERR_CONTENT" | grep '^{.*"type":"pr-suggestion"' | hea
 
 After running the script, handle the exit code:
 
-**If EXIT_CODE is 0**: Command succeeded.
+**If EXIT_CODE is 0**: Command succeeded. If this was a `create` command, proceed to worktree integration (see below).
 
 **If EXIT_CODE is 1**: Command failed with an error.
 
 **If EXIT_CODE is 2 and PR_SUGGESTION contains JSON**: A PR opportunity was detected (create command only). Parse the JSON and prompt the user for PR creation.
 
 **If EXIT_CODE is 3**: Import prompt needed (import command only). Parse JSON from stderr for branch-to-spec mapping.
+
+### [SPECK-EXTENSION] Worktree Integration for `create` Command
+
+**After successful branch creation (EXIT_CODE is 0 for create command)**, check worktree configuration and create worktree if enabled:
+
+1. **Check worktree configuration**: Load `.speck/config.json` and check if `worktree.enabled` is true
+2. **Parse the created branch name**: Extract branch name from command output or arguments
+3. **If worktree integration is enabled**:
+   - Run: `bun .speck/scripts/worktree/create.ts --branch "$BRANCH_NAME" --repo-path "$(pwd)"`
+     - Pass through `--no-ide` flag if user provided it
+     - Pass through `--no-deps` flag if user provided it
+     - Pass through `--reuse-worktree` flag if user provided it
+   - If creation succeeds:
+     - Report: "✓ Created worktree at [path]"
+     - If IDE auto-launch is enabled, report: "✓ Launched [IDE name]"
+   - If creation fails (non-fatal):
+     - Report warning: "⚠ Worktree creation failed: [error]"
+     - Continue (worktree is optional)
+4. **If worktree integration is disabled**:
+   - Skip worktree creation silently
+   - Branch is checked out in main repository (standard Git workflow)
+5. **Flag support** (override config):
+   - If user passed `--no-worktree` flag: Skip worktree creation even if enabled in config
+   - If user passed `--no-ide` flag: Pass `--no-ide` to worktree creation to skip IDE launch
+   - If user passed `--no-deps` flag: Pass `--no-deps` to worktree creation to skip dependency installation
+   - If user passed `--reuse-worktree` flag: Pass `--reuse-worktree` to worktree creation
 
 ## Agent Workflow for PR Suggestions (T031k-T031m)
 

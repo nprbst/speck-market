@@ -84,6 +84,25 @@ Given that feature description, do this:
    - The JSON output will contain BRANCH_NAME and SPEC_FILE paths
    - For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\''m Groot' (or double-quote if possible: "I'm Groot")
 
+   g. **[SPECK-EXTENSION] Worktree Integration** (Optional - enabled when worktree.enabled = true in .speck/config.json):
+      - **Check worktree configuration**: Load .speck/config.json and check if `worktree.enabled` is true
+      - **If worktree integration is enabled**:
+        1. Run: `bun .speck/scripts/worktree/create.ts --branch "$BRANCH_NAME" --repo-path "$(pwd)"`
+        2. If creation succeeds:
+           - Report: "✓ Created worktree at [path]"
+           - If IDE auto-launch is enabled, report: "✓ Launched [IDE name]"
+        3. If creation fails (non-fatal):
+           - Report warning: "⚠ Worktree creation failed: [error]"
+           - Continue with spec generation (worktree is optional)
+      - **If worktree integration is disabled**:
+        - Skip worktree creation silently
+        - Branch is checked out in main repository (standard Git workflow)
+      - **Flag support** (override config):
+        - If user passed `--no-worktree` flag: Skip worktree creation even if enabled in config
+        - If user passed `--worktree` flag: Create worktree even if disabled in config
+        - If user passed `--no-ide` flag: Pass `--no-ide` to worktree creation to skip IDE launch
+        - If user passed `--no-deps` flag: Pass `--no-deps` to worktree creation to skip dependency installation
+
 3. Load `${CLAUDE_PLUGIN_ROOT}/templates/spec-template.md` to understand required sections.
 
 4. Follow this execution flow:
