@@ -18,18 +18,6 @@ description: "Answer questions about Speck specs, plans, tasks, requirements, pr
 
 ---
 
-## Plugin Path Setup
-
-Before accessing templates or other plugin resources, determine the plugin root path by running:
-
-```bash
-cat "$HOME/.claude/speck-plugin-path" 2>/dev/null || echo ".speck"
-```
-
-Store this value and use `$PLUGIN_ROOT` in all subsequent file paths (e.g., `$PLUGIN_ROOT/templates/...`).
-
----
-
 ## Core Capabilities
 
 ### 1. Feature Discovery
