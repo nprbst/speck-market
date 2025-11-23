@@ -36,6 +36,7 @@ Creates a `.speck/root` symlink to enable multi-repo mode and registers this rep
 3. Specs now read/written to `<path>/specs/`
 4. Plans/tasks/constitution remain local to this repo
 5. **Automatically updates** `<path>/.speck/linked-repos.md` to register this repository
+6. Creates reverse symlink: `<speck-root>/.speck/repos/<repo-name>` → relative path back to this repo
 
 ## Multi-Repo Workflow
 
@@ -55,10 +56,20 @@ After linking, you can:
 2. If path is relative, prepend `../` to adjust for `.speck/` directory depth
 3. Create symlink: `ln -s <adjusted-path> .speck/root`
 4. Verify symlink works: `ls .speck/root/` should succeed
-5. Get repository info (name from git remote, absolute path, git user, today's date)
-6. Update `<speck-root>/.speck/linked-repos.md` by adding entry under "Active Links" section:
-   - Repository name (from git remote or directory name)
-   - Full absolute path to this repository
+5. Get repository info:
+   - Repository name from git remote (extract from URL)
+   - Git remote URL (`git remote get-url origin`)
+   - Relative path from speck root to this repo
+   - Git user name
+   - Today's date
+6. Create reverse symlink at speck root:
+   - Create `<speck-root>/.speck/repos/` directory if it doesn't exist
+   - Calculate relative path from `<speck-root>/.speck/repos/` back to this repo
+   - Create symlink: `ln -s <relative-path-back> <speck-root>/.speck/repos/<repo-name>`
+7. Update `<speck-root>/.speck/linked-repos.md` by adding entry under "Active Links" section:
+   - Repository name
+   - Git remote URL (primary)
+   - Relative path from speck root (for local development)
    - Today's date
    - Contact information (git user name or "Unknown")
    - Active features: "None yet"
@@ -67,7 +78,8 @@ After linking, you can:
 **Example entry format:**
 ```markdown
 ### repository-name
-- **Path/URL**: `/full/path/to/repository`
+- **Repository**: `https://github.com/org/repository-name.git`
+- **Local Path**: `../frontend/master` (relative from speck root)
 - **Linked**: 2025-11-23
 - **Contact**: Developer Name
 - **Active Features**: None yet
