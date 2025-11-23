@@ -1,25 +1,6 @@
 ---
 name: speck-knowledge
-description: |
-  Answer questions about Speck workflow, phases, commands, and artifacts (spec.md, plan.md, tasks.md). Covers workflow stages, file interpretation, requirements, architecture, task progress, and methodology.
-
-  WHEN to auto-invoke:
-  - Speck workflow/phases/methodology questions
-  - Speck slash command questions (/speck:*)
-  - Artifact interpretation (spec/plan/tasks files)
-  - Feature requirements, user stories, architecture
-  - Task status and progress tracking
-  - Template comparison
-  - Multi-repo mode detection and setup
-  - Stacked PR workflow and branch management
-  - Virtual command pattern and hooks
-  - Worktree integration and configuration
-  - Questions about branches.json, .speck/root, .speck/config.json
-
-  NOT WHEN:
-  - Creating/modifying files (guide to /speck:* commands)
-  - General coding/debugging unrelated to Speck
-  - Non-Speck documentation
+description: "Interpret Speck spec, plan, tasks, and constitution files. Answer questions about requirements, architecture, principles, and progress without running slash commands."
 ---
 
 # Speck Workflow Skill
