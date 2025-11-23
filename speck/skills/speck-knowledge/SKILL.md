@@ -1,6 +1,6 @@
 ---
 name: speck-knowledge
-description: "Interpret Speck spec, plan, tasks, and constitution files. Answer questions about requirements, architecture, principles, and progress without running slash commands."
+description: "Answer questions about Speck specs, plans, tasks, requirements, progress, architecture, user stories, feature status, and constitution. Interprets spec.md, plan.md, tasks.md files. Use when users ask about feature requirements, implementation status, or Speck workflow artifacts."
 ---
 
 # Speck Workflow Skill
