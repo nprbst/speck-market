@@ -29,10 +29,20 @@ Parse command-line flags from user input:
 1. **Setup**: Extract prerequisite context from the auto-injected comment in the prompt:
    ```
    <!-- SPECK_PREREQ_CONTEXT
-   {"MODE":"single-repo","FEATURE_DIR":"/path/to/specs/010-feature","AVAILABLE_DOCS":["spec.md"],"FILE_CONTENTS":{"spec.md":"...","constitution.md":"..."}}
+   {"MODE":"multi-repo","FEATURE_DIR":"/path/to/root-repo/specs/010-feature","IMPL_PLAN":"/path/to/child-repo/specs/010-feature/plan.md","TASKS":"/path/to/child-repo/specs/010-feature/tasks.md","REPO_ROOT":"/path/to/child-repo","AVAILABLE_DOCS":["spec.md"],"FILE_CONTENTS":{"spec.md":"...","constitution.md":"..."}}
    -->
    ```
-   Use FEATURE_DIR and FILE_CONTENTS from this JSON.
+
+   **Path Usage**:
+   - `FEATURE_DIR`: Directory containing shared artifacts (spec.md, research.md, data-model.md) - **READ ONLY**
+   - `IMPL_PLAN`: Full path where plan.md should be written - **WRITE HERE**
+   - `TASKS`: Full path where tasks.md should be written (used by /speck:tasks)
+   - `REPO_ROOT`: Root directory of current repository (for relative path calculations)
+   - `MODE`: "single-repo" or "multi-repo" (child in multi-repo setup)
+
+   **Multi-repo behavior**:
+   - In single-repo mode: FEATURE_DIR, IMPL_PLAN, and TASKS all point to same directory
+   - In multi-repo mode: FEATURE_DIR points to root repo (shared), IMPL_PLAN/TASKS point to child repo (local)
 
    **FILE_CONTENTS field**: Contains pre-loaded file contents. Possible values:
    - Full file content (string): File was successfully pre-loaded
@@ -85,7 +95,11 @@ Parse command-line flags from user input:
    - Phase 1: Update agent context by running the agent script
    - Re-evaluate Constitution Check post-design
 
-4. **Stop and report**: Command ends after Phase 2 planning. Report branch, IMPL_PLAN path, and generated artifacts.
+4. **Write plan.md**: Use the IMPL_PLAN path from prerequisite context to write plan.md file.
+   - **IMPORTANT**: Write to IMPL_PLAN path, NOT to FEATURE_DIR/plan.md
+   - In multi-repo mode, IMPL_PLAN points to child repo, FEATURE_DIR points to root repo
+
+5. **Stop and report**: Command ends after Phase 2 planning. Report branch, IMPL_PLAN path, and generated artifacts.
 
 ## Phases
 
@@ -109,6 +123,7 @@ Parse command-line flags from user input:
    - Decision: [what was chosen]
    - Rationale: [why chosen]
    - Alternatives considered: [what else evaluated]
+   - **Write to**: `{FEATURE_DIR}/research.md` (shared artifact, goes to root in multi-repo)
 
 **Output**: research.md with all NEEDS CLARIFICATION resolved
 
@@ -120,11 +135,12 @@ Parse command-line flags from user input:
    - Entity name, fields, relationships
    - Validation rules from requirements
    - State transitions if applicable
+   - **Write to**: `{FEATURE_DIR}/data-model.md` (shared artifact, goes to root in multi-repo)
 
 2. **Generate API contracts** from functional requirements:
    - For each user action → endpoint
    - Use standard REST/GraphQL patterns
-   - Output OpenAPI/GraphQL schema to `/contracts/`
+   - **Write to**: `{FEATURE_DIR}/contracts/` (shared artifacts, go to root in multi-repo)
 
 3. **Agent context update**:
    - Run `speck-update-agent-context claude`
@@ -133,7 +149,7 @@ Parse command-line flags from user input:
    - Add only new technology from current plan
    - Preserve manual additions between markers
 
-**Output**: data-model.md, /contracts/*, quickstart.md, agent-specific file
+**Output**: data-model.md, /contracts/*, quickstart.md (all in FEATURE_DIR - shared), agent-specific file
 
 ## Key rules
 

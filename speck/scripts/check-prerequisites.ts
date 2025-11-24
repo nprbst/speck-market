@@ -76,6 +76,10 @@ export interface ValidationOutput {
   AVAILABLE_DOCS: string[];
   FILE_CONTENTS?: Record<string, string>;
   WORKFLOW_MODE?: string;
+  // Multi-repo support: paths for writing implementation artifacts
+  IMPL_PLAN?: string;
+  TASKS?: string;
+  REPO_ROOT?: string;
 }
 
 /**
@@ -453,9 +457,13 @@ export async function main(args: string[]): Promise<number> {
       AVAILABLE_DOCS: docs,
       ...(fileContents && { FILE_CONTENTS: fileContents }),
       ...(workflowMode && { WORKFLOW_MODE: workflowMode }),
+      // Include implementation paths for multi-repo support
+      IMPL_PLAN: paths.IMPL_PLAN,
+      TASKS: paths.TASKS,
+      REPO_ROOT: paths.REPO_ROOT,
     };
     console.log(JSON.stringify(output));
-  } else {
+  } else{
     // Text output
     console.log(`FEATURE_DIR:${paths.FEATURE_DIR}`);
     console.log("AVAILABLE_DOCS:");
