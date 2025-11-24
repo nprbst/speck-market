@@ -81,6 +81,8 @@ export interface FeaturePaths {
   DATA_MODEL: string;
   QUICKSTART: string;
   CONTRACTS_DIR: string;
+  CHECKLISTS_DIR: string;
+  LINKED_REPOS: string;
 }
 
 /**
@@ -830,6 +832,9 @@ export async function getFeaturePaths(): Promise<FeaturePaths> {
   const featureDir = await findFeatureDirByPrefix(config.specsDir, currentBranch, config.repoRoot);
   const featureName = path.basename(featureDir);
 
+  // Local specs directory for implementation artifacts
+  const localSpecsDir = path.join(config.repoRoot, "specs", featureName);
+
   return {
     MODE: config.mode,
     SPECK_ROOT: config.speckRoot,
@@ -838,13 +843,15 @@ export async function getFeaturePaths(): Promise<FeaturePaths> {
     CURRENT_BRANCH: currentBranch,
     HAS_GIT: hasGitRepo ? "true" : "false",
     FEATURE_DIR: featureDir,
-    FEATURE_SPEC: path.join(featureDir, "spec.md"),  // Uses specsDir (shared in multi-repo)
-    IMPL_PLAN: path.join(config.repoRoot, "specs", featureName, "plan.md"),  // Always local
-    TASKS: path.join(config.repoRoot, "specs", featureName, "tasks.md"),  // Always local
-    RESEARCH: path.join(featureDir, "research.md"),  // Uses specsDir (shared in multi-repo)
-    DATA_MODEL: path.join(featureDir, "data-model.md"),  // Uses specsDir (shared in multi-repo)
-    QUICKSTART: path.join(featureDir, "quickstart.md"),  // Uses specsDir (shared in multi-repo)
-    CONTRACTS_DIR: path.join(featureDir, "contracts"),  // Uses specsDir (shared in multi-repo)
+    FEATURE_SPEC: path.join(featureDir, "spec.md"),  // Shared (root repo)
+    CHECKLISTS_DIR: path.join(featureDir, "checklists"),  // Shared (root repo)
+    LINKED_REPOS: path.join(featureDir, "linked-repos.md"),  // Shared (root repo)
+    IMPL_PLAN: path.join(localSpecsDir, "plan.md"),  // Local (child repo)
+    TASKS: path.join(localSpecsDir, "tasks.md"),  // Local (child repo)
+    RESEARCH: path.join(localSpecsDir, "research.md"),  // Local (child repo)
+    DATA_MODEL: path.join(localSpecsDir, "data-model.md"),  // Local (child repo)
+    QUICKSTART: path.join(localSpecsDir, "quickstart.md"),  // Local (child repo)
+    CONTRACTS_DIR: path.join(localSpecsDir, "contracts"),  // Local (child repo)
   };
   // [SPECK-EXTENSION:END]
 }

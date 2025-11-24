@@ -364,37 +364,64 @@ export async function main(args: string[]): Promise<number> {
     return ExitCode.USER_ERROR;
   }
 
-  // Build list of available documents
+  // Build list of available documents (absolute paths)
   const docs: string[] = [];
 
-  // Always check these optional docs
-  if (existsSync(paths.RESEARCH)) {
-    docs.push("research.md");
+  // Shared files (from root repo in multi-repo mode)
+  if (existsSync(paths.FEATURE_SPEC)) {
+    docs.push(paths.FEATURE_SPEC);
   }
 
-  if (existsSync(paths.DATA_MODEL)) {
-    docs.push("data-model.md");
+  if (existsSync(paths.LINKED_REPOS)) {
+    docs.push(paths.LINKED_REPOS);
   }
 
-  // Check contracts directory (only if it exists and has files)
-  if (existsSync(paths.CONTRACTS_DIR)) {
+  // Check checklists directory (shared, from root repo)
+  if (existsSync(paths.CHECKLISTS_DIR)) {
     try {
-      const files = readdirSync(paths.CONTRACTS_DIR);
-      if (files.length > 0) {
-        docs.push("contracts/");
+      const files = readdirSync(paths.CHECKLISTS_DIR);
+      const mdFiles = files.filter(f => f.endsWith(".md"));
+      // Add individual checklist files as absolute paths
+      for (const file of mdFiles) {
+        docs.push(join(paths.CHECKLISTS_DIR, file));
       }
     } catch {
       // Directory not readable, skip
     }
   }
 
+  // Local files (from child repo in multi-repo mode)
+  if (existsSync(paths.IMPL_PLAN)) {
+    docs.push(paths.IMPL_PLAN);
+  }
+
+  if (existsSync(paths.RESEARCH)) {
+    docs.push(paths.RESEARCH);
+  }
+
+  if (existsSync(paths.DATA_MODEL)) {
+    docs.push(paths.DATA_MODEL);
+  }
+
   if (existsSync(paths.QUICKSTART)) {
-    docs.push("quickstart.md");
+    docs.push(paths.QUICKSTART);
+  }
+
+  // Check contracts directory (local, from child repo)
+  if (existsSync(paths.CONTRACTS_DIR)) {
+    try {
+      const files = readdirSync(paths.CONTRACTS_DIR);
+      if (files.length > 0) {
+        docs.push(paths.CONTRACTS_DIR);
+      }
+    } catch {
+      // Directory not readable, skip
+    }
   }
 
   // Include tasks.md if requested and it exists
   if (options.includeTasks && existsSync(paths.TASKS)) {
-    docs.push("tasks.md");
+    docs.push(paths.TASKS);
   }
 
   // Load file contents if requested
@@ -414,13 +441,12 @@ export async function main(args: string[]): Promise<number> {
     fileContents["data-model.md"] = loadFileContent(paths.DATA_MODEL, totalSize);
     fileContents["research.md"] = loadFileContent(paths.RESEARCH, totalSize);
 
-    // Load checklist files (if checklists/ directory exists)
-    const checklistsDir = join(paths.FEATURE_DIR, "checklists");
-    if (existsSync(checklistsDir)) {
+    // Load checklist files (shared from root repo)
+    if (existsSync(paths.CHECKLISTS_DIR)) {
       try {
-        const checklistFiles = readdirSync(checklistsDir).filter(f => f.endsWith(".md"));
+        const checklistFiles = readdirSync(paths.CHECKLISTS_DIR).filter(f => f.endsWith(".md"));
         for (const file of checklistFiles) {
-          const checklistPath = join(checklistsDir, file);
+          const checklistPath = join(paths.CHECKLISTS_DIR, file);
           fileContents[`checklists/${file}`] = loadFileContent(checklistPath, totalSize);
         }
       } catch {
@@ -468,14 +494,18 @@ export async function main(args: string[]): Promise<number> {
     console.log(`FEATURE_DIR:${paths.FEATURE_DIR}`);
     console.log("AVAILABLE_DOCS:");
 
-    // Show status of each potential document
-    console.log(checkFile(paths.RESEARCH, "research.md"));
-    console.log(checkFile(paths.DATA_MODEL, "data-model.md"));
-    console.log(checkDir(paths.CONTRACTS_DIR, "contracts/"));
-    console.log(checkFile(paths.QUICKSTART, "quickstart.md"));
+    // Show status of each potential document with absolute paths
+    console.log(checkFile(paths.FEATURE_SPEC, paths.FEATURE_SPEC));
+    console.log(checkFile(paths.LINKED_REPOS, paths.LINKED_REPOS));
+    console.log(checkDir(paths.CHECKLISTS_DIR, paths.CHECKLISTS_DIR));
+    console.log(checkFile(paths.IMPL_PLAN, paths.IMPL_PLAN));
+    console.log(checkFile(paths.RESEARCH, paths.RESEARCH));
+    console.log(checkFile(paths.DATA_MODEL, paths.DATA_MODEL));
+    console.log(checkFile(paths.QUICKSTART, paths.QUICKSTART));
+    console.log(checkDir(paths.CONTRACTS_DIR, paths.CONTRACTS_DIR));
 
     if (options.includeTasks) {
-      console.log(checkFile(paths.TASKS, "tasks.md"));
+      console.log(checkFile(paths.TASKS, paths.TASKS));
     }
   }
 
