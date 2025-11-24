@@ -12,6 +12,7 @@ Advanced features from features 007-012: Multi-repo support, stacked PRs, virtua
 2. [Stacked PR Mode Detection](#stacked-pr-mode-detection)
 3. [Virtual Command Architecture](#virtual-command-architecture)
 4. [Worktree Mode Detection](#worktree-mode-detection)
+5. [Hook Failures and Fallback Methods](#hook-failures-and-fallback-methods)
 
 ---
 
@@ -274,3 +275,101 @@ After worktree creation:
 - "What's the worktree config?" → Read `.speck/config.json` worktree section
 - "Which worktrees exist?" → List `.speck/worktrees/*/metadata.json` files or `git worktree list`
 - "How are files managed?" → Explain copy vs symlink rules from config.json
+
+---
+
+## Hook Failures and Fallback Methods
+
+When VSCode Claude Extension hooks fail (known bug), slash commands won't receive prerequisite context automatically. This section explains how to troubleshoot and work around hook failures.
+
+**Common Symptoms**:
+- Missing `SPECK_PREREQ_CONTEXT` comment in slash command prompts
+- Virtual commands fail with exit code 127 ("command not found")
+- Slash commands ask you to run prerequisite checks manually
+
+**Root Cause**:
+VSCode Claude Extension has a bug that prevents PreToolUse and UserPromptSubmit hooks from executing for installed plugins. This breaks:
+1. **UserPromptSubmit hook**: Prerequisite context not injected into prompts
+2. **PreToolUse hook**: Virtual commands (`speck-*`) not intercepted
+
+**Fallback Method 1: Virtual Commands**
+
+If SPECK_PREREQ_CONTEXT is missing, try running the virtual command:
+
+```bash
+speck-check-prerequisites --json [options]
+speck-setup-plan --json
+```
+
+These virtual commands work when PreToolUse hook is functional.
+
+**Fallback Method 2: Direct Script Execution**
+
+If virtual commands fail with exit code 127, run scripts directly from the installed plugin:
+
+```bash
+bun ~/.claude/plugins/marketplaces/speck-market/speck/scripts/<script-name>.ts --json [options]
+```
+
+**Available Scripts**:
+- `check-prerequisites.ts` - Validate feature directory and generate context
+- `setup-plan.ts` - Initialize planning workflow
+- `create-new-feature.ts` - Create new feature specification
+- `update-agent-context.ts` - Update agent context files
+
+**Script Options by Command**:
+
+| Slash Command | Script | Required Options |
+|---------------|--------|------------------|
+| `/speck.implement` | `check-prerequisites.ts` | `--json --require-tasks --include-tasks` |
+| `/speck.plan` | `setup-plan.ts` | `--json` |
+| `/speck.tasks` | `check-prerequisites.ts` | `--json` |
+| `/speck.analyze` | `check-prerequisites.ts` | `--json --require-tasks --include-tasks` |
+| `/speck.clarify` | `check-prerequisites.ts` | `--json --paths-only` |
+| `/speck.checklist` | `check-prerequisites.ts` | `--json` |
+| `/speck.taskstoissues` | `check-prerequisites.ts` | `--json --require-tasks --include-tasks` |
+
+**Multi-Repo Context with Fallbacks**:
+
+When running fallback commands in multi-repo mode, the scripts automatically detect:
+- Mode detection via `.speck/root` symlink
+- Shared specs location (root repo `specs/`)
+- Local implementation artifacts (child repo `specs/`)
+
+**Example: Multi-Repo Fallback**
+
+```bash
+# In child repo directory
+cd /path/to/child-repo
+
+# Run prerequisite check
+bun ~/.claude/plugins/marketplaces/speck-market/speck/scripts/check-prerequisites.ts --json
+
+# Output includes both shared and local paths:
+{
+  "MODE": "multi-repo",
+  "FEATURE_DIR": "/path/to/root-repo/specs/007-feature",
+  "IMPL_PLAN": "/path/to/child-repo/specs/007-feature/plan.md",
+  "TASKS": "/path/to/child-repo/specs/007-feature/tasks.md",
+  "REPO_ROOT": "/path/to/child-repo",
+  "AVAILABLE_DOCS": [
+    "../../../root-repo/specs/007-feature/spec.md",
+    "specs/007-feature/plan.md",
+    "specs/007-feature/tasks.md"
+  ]
+}
+```
+
+**Interpreting Fallback Output**:
+
+When slash commands show fallback instructions:
+1. Copy the exact `bun` command shown
+2. Run it in your terminal from the repository root
+3. Parse the JSON output to extract needed paths
+4. Provide the parsed information to the slash command
+
+**User Query Examples**:
+- "Why isn't SPECK_PREREQ_CONTEXT showing up?" → Explain VSCode hook bug, suggest fallback method
+- "How do I run prerequisite checks manually?" → Show `bun ~/.claude/plugins/.../check-prerequisites.ts --json`
+- "Where are the scripts in the installed plugin?" → Explain `~/.claude/plugins/marketplaces/speck-market/speck/scripts/`
+- "Do fallbacks work in multi-repo mode?" → Explain automatic mode detection via `.speck/root` symlink
