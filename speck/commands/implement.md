@@ -22,19 +22,10 @@ Parse command-line flags from user input:
 1. Extract prerequisite context from the auto-injected comment in the prompt:
    ```
    <!-- SPECK_PREREQ_CONTEXT
-   {"MODE":"single-repo","FEATURE_DIR":"/path/to/specs/010-feature","AVAILABLE_DOCS":["research.md","tasks.md"],"FILE_CONTENTS":{"tasks.md":"...","plan.md":"..."},"WORKFLOW_MODE":"single-branch"}
+   {"MODE":"single-repo","FEATURE_DIR":"/path/to/specs/010-feature","AVAILABLE_DOCS":["specs/010-feature/research.md","specs/010-feature/tasks.md","specs/010-feature/plan.md",".speck/memory/constitution.md","../../../8-specs/specs/010-feature/checklists/requirements.md"],"WORKFLOW_MODE":"single-branch"}
    -->
    ```
-   Use the FEATURE_DIR, AVAILABLE_DOCS, FILE_CONTENTS, and WORKFLOW_MODE values from this JSON. All paths are absolute.
-
-   **FILE_CONTENTS field**: Contains pre-loaded file contents for high/medium priority files. Possible values:
-   - Full file content (string): File was successfully pre-loaded
-   - `"NOT_FOUND"`: File does not exist
-   - `"TOO_LARGE"`: File exceeds size limits (use Read tool instead)
-
-   Pre-loaded files include:
-   - tasks.md, plan.md, constitution.md, data-model.md
-   - checklists/*.md (all checklist files in checklists/ directory, keyed as "checklists/filename.md")
+   Use the FEATURE_DIR, AVAILABLE_DOCS, and WORKFLOW_MODE values from this JSON.
 
    **WORKFLOW_MODE field**: Pre-determined workflow mode (`"stacked-pr"` or `"single-branch"`) from plan.md → constitution.md → default.
 
@@ -44,10 +35,8 @@ Parse command-line flags from user input:
    ```
 
 2. **Check checklists status** (if checklists exist):
-   - **Check FILE_CONTENTS from prerequisite context first** (step 1):
-     - Look for keys starting with "checklists/" (e.g., "checklists/requirements.md", "checklists/security.md")
-     - If checklist files found in FILE_CONTENTS: Use pre-loaded content
-     - If no checklists in FILE_CONTENTS: Use Glob tool to scan {FEATURE_DIR}/checklists/*.md
+   - Find checklist files from AVAILABLE_DOCS (paths containing "/checklists/")
+   - Use Read tool to load each checklist file
    - For each checklist, count:
      - Total items: All lines matching `- [ ]` or `- [X]` or `- [x]`
      - Completed items: Lines matching `- [X]` or `- [x]`
@@ -79,22 +68,17 @@ Parse command-line flags from user input:
 
 3. Load and analyze the implementation context:
 
-   **Check FILE_CONTENTS from prerequisite context first** (step 1):
-   - For tasks.md, plan.md, constitution.md, data-model.md:
-     - If FILE_CONTENTS[filename] exists and is NOT `"NOT_FOUND"` or `"TOO_LARGE"`: Use the pre-loaded content
-     - If FILE_CONTENTS[filename] is `"TOO_LARGE"`: Use Read tool to load the file
-     - If FILE_CONTENTS[filename] is `"NOT_FOUND"`: Skip this file
-     - If FILE_CONTENTS field is not present: Use Read tool (backwards compatibility)
+   Use Read tool to load files from paths in AVAILABLE_DOCS:
 
    **Required files**:
-   - **REQUIRED**: tasks.md (check FILE_CONTENTS first, then Read if needed)
-   - **REQUIRED**: plan.md (check FILE_CONTENTS first, then Read if needed)
+   - **REQUIRED**: tasks.md
+   - **REQUIRED**: plan.md
 
-   **Optional files** (only if they exist):
-   - data-model.md (check FILE_CONTENTS first, then Read if needed)
-   - contracts/ (always use Read/Glob, not pre-loaded)
-   - research.md (always use Read, not pre-loaded)
-   - quickstart.md (always use Read, not pre-loaded)
+   **Optional files** (only if they exist in AVAILABLE_DOCS):
+   - data-model.md
+   - contracts/ files
+   - research.md
+   - quickstart.md
 
 3a. **Determine Workflow Mode** (for stacked PR automation):
    - Check command-line flags first (highest priority):

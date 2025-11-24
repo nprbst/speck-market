@@ -27,17 +27,10 @@ Identify inconsistencies, duplications, ambiguities, and underspecified items ac
 Extract prerequisite context from the auto-injected comment in the prompt:
 ```
 <!-- SPECK_PREREQ_CONTEXT
-{"MODE":"single-repo","FEATURE_DIR":"/path/to/specs/010-feature","AVAILABLE_DOCS":["spec.md","plan.md","tasks.md"],"FILE_CONTENTS":{"spec.md":"...","plan.md":"...","tasks.md":"...","constitution.md":"..."}}
+{"MODE":"single-repo","FEATURE_DIR":"/path/to/specs/010-feature","AVAILABLE_DOCS":["specs/010-feature/spec.md","specs/010-feature/plan.md","specs/010-feature/tasks.md",".speck/memory/constitution.md"]}
 -->
 ```
-Use FEATURE_DIR and FILE_CONTENTS from this JSON. All paths are absolute.
-
-**FILE_CONTENTS field**: Contains pre-loaded file contents for required files. Possible values:
-- Full file content (string): File was successfully pre-loaded
-- `"NOT_FOUND"`: File does not exist (abort with error)
-- `"TOO_LARGE"`: File exceeds size limits (use Read tool instead)
-
-Pre-loaded files: `spec.md`, `plan.md`, `tasks.md`, `constitution.md`
+Use FEATURE_DIR and AVAILABLE_DOCS from this JSON.
 
 **Fallback**: If the comment is not present (backwards compatibility), run:
 ```bash
@@ -48,14 +41,7 @@ Abort with an error message if any required file is missing (instruct the user t
 
 ### 2. Load Artifacts (Progressive Disclosure)
 
-**Check FILE_CONTENTS from prerequisite context first** (step 1):
-- For spec.md, plan.md, tasks.md, constitution.md:
-  - If FILE_CONTENTS[filename] exists and is NOT `"NOT_FOUND"` or `"TOO_LARGE"`: Use the pre-loaded content
-  - If FILE_CONTENTS[filename] is `"TOO_LARGE"`: Use Read tool to load the file
-  - If FILE_CONTENTS[filename] is `"NOT_FOUND"`: Abort with error (file is required)
-  - If FILE_CONTENTS field is not present: Use Read tool (backwards compatibility)
-
-Load only the minimal necessary context from each artifact:
+Use Read tool to load files from paths in AVAILABLE_DOCS. Load only the minimal necessary context from each artifact:
 
 **From spec.md:**
 

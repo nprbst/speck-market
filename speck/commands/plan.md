@@ -29,7 +29,7 @@ Parse command-line flags from user input:
 1. **Setup**: Extract prerequisite context from the auto-injected comment in the prompt:
    ```
    <!-- SPECK_PREREQ_CONTEXT
-   {"MODE":"multi-repo","FEATURE_DIR":"/path/to/root-repo/specs/010-feature","IMPL_PLAN":"/path/to/child-repo/specs/010-feature/plan.md","TASKS":"/path/to/child-repo/specs/010-feature/tasks.md","REPO_ROOT":"/path/to/child-repo","AVAILABLE_DOCS":["spec.md"],"FILE_CONTENTS":{"spec.md":"...","constitution.md":"..."}}
+   {"MODE":"multi-repo","FEATURE_DIR":"/path/to/root-repo/specs/010-feature","IMPL_PLAN":"/path/to/child-repo/specs/010-feature/plan.md","TASKS":"/path/to/child-repo/specs/010-feature/tasks.md","REPO_ROOT":"/path/to/child-repo","AVAILABLE_DOCS":["../../../8-specs/specs/010-feature/spec.md",".speck/memory/constitution.md"]}
    -->
    ```
 
@@ -44,20 +44,6 @@ Parse command-line flags from user input:
    - In single-repo mode: FEATURE_DIR, IMPL_PLAN, and TASKS all point to same directory
    - In multi-repo mode: FEATURE_DIR points to root repo (shared), IMPL_PLAN/TASKS point to child repo (local)
 
-   **FILE_CONTENTS field**: Contains pre-loaded file contents. Possible values:
-   - Full file content (string): File was successfully pre-loaded
-   - `"NOT_FOUND"`: File does not exist
-   - `"TOO_LARGE"`: File exceeds size limits (use Read tool instead)
-
-   Pre-loaded files: `spec.md`, `constitution.md`
-
-   **Check FILE_CONTENTS from prerequisite context first**:
-   - For spec.md, constitution.md:
-     - If FILE_CONTENTS[filename] exists and is NOT `"NOT_FOUND"` or `"TOO_LARGE"`: Use the pre-loaded content
-     - If FILE_CONTENTS[filename] is `"TOO_LARGE"`: Use Read tool to load the file
-     - If FILE_CONTENTS[filename] is `"NOT_FOUND"`: Skip this file (error if required)
-     - If FILE_CONTENTS field is not present: Use Read tool (backwards compatibility)
-
    **Fallback**: If the comment is not present (backwards compatibility), run:
    ```bash
    speck-setup-plan --json
@@ -65,8 +51,7 @@ Parse command-line flags from user input:
    Parse JSON for FEATURE_SPEC, IMPL_PLAN, SPECS_DIR, BRANCH.
 
 2. **Load context**:
-   - Read spec.md from FILE_CONTENTS (step 1) or using Read tool if needed
-   - Read constitution.md from FILE_CONTENTS (step 1) or using Read tool if needed
+   - Read spec.md and constitution.md from paths in AVAILABLE_DOCS using Read tool
    - Load plan.md template (always use Read - not pre-loaded)
 
 3. **Execute plan workflow**: Follow the structure in IMPL_PLAN template to:

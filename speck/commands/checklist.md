@@ -36,17 +36,10 @@ You **MUST** consider the user input before proceeding (if not empty).
 1. **Setup**: Extract prerequisite context from the auto-injected comment in the prompt:
    ```
    <!-- SPECK_PREREQ_CONTEXT
-   {"MODE":"single-repo","FEATURE_DIR":"/path/to/specs/010-feature","AVAILABLE_DOCS":["spec.md","plan.md"],"FILE_CONTENTS":{"spec.md":"...","plan.md":"...","tasks.md":"..."}}
+   {"MODE":"single-repo","FEATURE_DIR":"/path/to/specs/010-feature","AVAILABLE_DOCS":["specs/010-feature/spec.md","specs/010-feature/plan.md","specs/010-feature/tasks.md"]}
    -->
    ```
-   Use the FEATURE_DIR, AVAILABLE_DOCS, and FILE_CONTENTS values from this JSON. All paths are absolute.
-
-   **FILE_CONTENTS field**: Contains pre-loaded file contents. Possible values:
-   - Full file content (string): File was successfully pre-loaded
-   - `"NOT_FOUND"`: File does not exist
-   - `"TOO_LARGE"`: File exceeds size limits (use Read tool instead)
-
-   Pre-loaded files: `spec.md`, `plan.md`, `tasks.md`
+   Use the FEATURE_DIR and AVAILABLE_DOCS values from this JSON.
 
    **Fallback**: If the comment is not present (backwards compatibility), run:
    ```bash
@@ -91,14 +84,7 @@ You **MUST** consider the user input before proceeding (if not empty).
    - Map focus selections to category scaffolding
    - Infer any missing context from spec/plan/tasks (do NOT hallucinate)
 
-4. **Load feature context**: Read from FEATURE_DIR:
-   **Check FILE_CONTENTS from prerequisite context first** (step 1):
-   - For spec.md, plan.md, tasks.md:
-     - If FILE_CONTENTS[filename] exists and is NOT `"NOT_FOUND"` or `"TOO_LARGE"`: Use the pre-loaded content
-     - If FILE_CONTENTS[filename] is `"TOO_LARGE"`: Use Read tool to load the file
-     - If FILE_CONTENTS[filename] is `"NOT_FOUND"`: Skip this file
-     - If FILE_CONTENTS field is not present: Use Read tool (backwards compatibility)
-
+4. **Load feature context**: Use Read tool to load files from paths in AVAILABLE_DOCS:
    Files to load:
    - spec.md: Feature requirements and scope
    - plan.md (if exists): Technical details, dependencies
