@@ -28,7 +28,7 @@
  */
 
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { join, basename } from "node:path";
+import { join, basename, relative } from "node:path";
 import {
   getFeaturePaths,
   checkFeatureBranch,
@@ -402,21 +402,33 @@ export async function main(args: string[]): Promise<number> {
     return ExitCode.USER_ERROR;
   }
 
-  // Build list of available documents (absolute paths)
+  // Build list of available documents (relative paths from REPO_ROOT)
   // Collect all files from both root repo feature dir and child repo feature dir
-  const docs: string[] = [];
+  const absoluteDocs: string[] = [];
 
   // 1. Collect all files from root repo feature directory (shared spec, checklists, etc.)
   const rootFeatureFiles = collectAllFiles(paths.FEATURE_DIR);
-  docs.push(...rootFeatureFiles);
+  absoluteDocs.push(...rootFeatureFiles);
 
   // 2. Add linked-repos.md from root repo .speck directory (if exists)
   const linkedReposPath = join(paths.SPECK_ROOT, ".speck", "linked-repos.md");
   if (existsSync(linkedReposPath)) {
-    docs.push(linkedReposPath);
+    absoluteDocs.push(linkedReposPath);
   }
 
-  // 3. Collect all files from child repo feature directory (plan, tasks, research, etc.)
+  // 3. Add constitution.md from root repo (if exists)
+  const rootConstitutionPath = join(paths.SPECK_ROOT, ".speck", "memory", "constitution.md");
+  if (existsSync(rootConstitutionPath)) {
+    absoluteDocs.push(rootConstitutionPath);
+  }
+
+  // 4. Add constitution.md from child repo (if exists and different from root)
+  const childConstitutionPath = join(paths.REPO_ROOT, ".speck", "memory", "constitution.md");
+  if (childConstitutionPath !== rootConstitutionPath && existsSync(childConstitutionPath)) {
+    absoluteDocs.push(childConstitutionPath);
+  }
+
+  // 5. Collect all files from child repo feature directory (plan, tasks, research, etc.)
   // In multi-repo mode, this is different from FEATURE_DIR
   // In single-repo mode, this is the same as FEATURE_DIR (so we'll dedupe)
   const featureName = basename(paths.FEATURE_DIR);
@@ -425,13 +437,27 @@ export async function main(args: string[]): Promise<number> {
   if (localFeatureDir !== paths.FEATURE_DIR) {
     // Multi-repo mode: collect files from child repo
     const localFeatureFiles = collectAllFiles(localFeatureDir);
-    docs.push(...localFeatureFiles);
+    absoluteDocs.push(...localFeatureFiles);
   }
 
-  // 4. Filter out tasks.md unless --include-tasks is set
+  // 6. Convert to relative paths (relative to REPO_ROOT or SPECK_ROOT depending on location)
+  const relativeDocs = absoluteDocs.map(absolutePath => {
+    // If file is in REPO_ROOT, make it relative to REPO_ROOT
+    if (absolutePath.startsWith(paths.REPO_ROOT)) {
+      return relative(paths.REPO_ROOT, absolutePath);
+    }
+    // If file is in SPECK_ROOT (root repo), make it relative to SPECK_ROOT
+    if (absolutePath.startsWith(paths.SPECK_ROOT)) {
+      return relative(paths.SPECK_ROOT, absolutePath);
+    }
+    // Fallback: return as-is (shouldn't happen)
+    return absolutePath;
+  });
+
+  // 7. Filter out tasks.md unless --include-tasks is set
   const filteredDocs = options.includeTasks
-    ? docs
-    : docs.filter(filePath => !filePath.endsWith("tasks.md"));
+    ? relativeDocs
+    : relativeDocs.filter(filePath => !filePath.endsWith("tasks.md"));
 
   // Load file contents if requested
   let fileContents: Record<string, string> | undefined;
