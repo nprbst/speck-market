@@ -27,13 +27,11 @@
  * - Preserved all CLI flags and exit codes exactly
  */
 
-import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { join, basename } from "node:path";
 import {
   getFeaturePaths,
   checkFeatureBranch,
-  checkFile,
-  checkDir,
   type FeaturePaths,
 } from "./common/paths";
 import { ExitCode } from "./contracts/cli-interface";
@@ -80,6 +78,46 @@ export interface ValidationOutput {
   IMPL_PLAN?: string;
   TASKS?: string;
   REPO_ROOT?: string;
+}
+
+/**
+ * Recursively collect all files from a directory
+ *
+ * @param dirPath - Directory to traverse
+ * @param fileList - Accumulator for file paths
+ * @returns Array of absolute file paths
+ */
+function collectAllFiles(dirPath: string, fileList: string[] = []): string[] {
+  if (!existsSync(dirPath)) {
+    return fileList;
+  }
+
+  try {
+    const entries = readdirSync(dirPath);
+
+    for (const entry of entries) {
+      const fullPath = join(dirPath, entry);
+
+      try {
+        const stat = statSync(fullPath);
+
+        if (stat.isDirectory()) {
+          // Recursively traverse subdirectories
+          collectAllFiles(fullPath, fileList);
+        } else if (stat.isFile()) {
+          // Add file to list
+          fileList.push(fullPath);
+        }
+      } catch {
+        // Skip entries that can't be statted (broken symlinks, permission issues, etc.)
+        continue;
+      }
+    }
+  } catch {
+    // Directory not readable, skip
+  }
+
+  return fileList;
 }
 
 /**
@@ -365,64 +403,35 @@ export async function main(args: string[]): Promise<number> {
   }
 
   // Build list of available documents (absolute paths)
+  // Collect all files from both root repo feature dir and child repo feature dir
   const docs: string[] = [];
 
-  // Shared files (from root repo in multi-repo mode)
-  if (existsSync(paths.FEATURE_SPEC)) {
-    docs.push(paths.FEATURE_SPEC);
+  // 1. Collect all files from root repo feature directory (shared spec, checklists, etc.)
+  const rootFeatureFiles = collectAllFiles(paths.FEATURE_DIR);
+  docs.push(...rootFeatureFiles);
+
+  // 2. Add linked-repos.md from root repo .speck directory (if exists)
+  const linkedReposPath = join(paths.SPECK_ROOT, ".speck", "linked-repos.md");
+  if (existsSync(linkedReposPath)) {
+    docs.push(linkedReposPath);
   }
 
-  if (existsSync(paths.LINKED_REPOS)) {
-    docs.push(paths.LINKED_REPOS);
+  // 3. Collect all files from child repo feature directory (plan, tasks, research, etc.)
+  // In multi-repo mode, this is different from FEATURE_DIR
+  // In single-repo mode, this is the same as FEATURE_DIR (so we'll dedupe)
+  const featureName = basename(paths.FEATURE_DIR);
+  const localFeatureDir = join(paths.REPO_ROOT, "specs", featureName);
+
+  if (localFeatureDir !== paths.FEATURE_DIR) {
+    // Multi-repo mode: collect files from child repo
+    const localFeatureFiles = collectAllFiles(localFeatureDir);
+    docs.push(...localFeatureFiles);
   }
 
-  // Check checklists directory (shared, from root repo)
-  if (existsSync(paths.CHECKLISTS_DIR)) {
-    try {
-      const files = readdirSync(paths.CHECKLISTS_DIR);
-      const mdFiles = files.filter(f => f.endsWith(".md"));
-      // Add individual checklist files as absolute paths
-      for (const file of mdFiles) {
-        docs.push(join(paths.CHECKLISTS_DIR, file));
-      }
-    } catch {
-      // Directory not readable, skip
-    }
-  }
-
-  // Local files (from child repo in multi-repo mode)
-  if (existsSync(paths.IMPL_PLAN)) {
-    docs.push(paths.IMPL_PLAN);
-  }
-
-  if (existsSync(paths.RESEARCH)) {
-    docs.push(paths.RESEARCH);
-  }
-
-  if (existsSync(paths.DATA_MODEL)) {
-    docs.push(paths.DATA_MODEL);
-  }
-
-  if (existsSync(paths.QUICKSTART)) {
-    docs.push(paths.QUICKSTART);
-  }
-
-  // Check contracts directory (local, from child repo)
-  if (existsSync(paths.CONTRACTS_DIR)) {
-    try {
-      const files = readdirSync(paths.CONTRACTS_DIR);
-      if (files.length > 0) {
-        docs.push(paths.CONTRACTS_DIR);
-      }
-    } catch {
-      // Directory not readable, skip
-    }
-  }
-
-  // Include tasks.md if requested and it exists
-  if (options.includeTasks && existsSync(paths.TASKS)) {
-    docs.push(paths.TASKS);
-  }
+  // 4. Filter out tasks.md unless --include-tasks is set
+  const filteredDocs = options.includeTasks
+    ? docs
+    : docs.filter(filePath => !filePath.endsWith("tasks.md"));
 
   // Load file contents if requested
   let fileContents: Record<string, string> | undefined;
@@ -480,7 +489,7 @@ export async function main(args: string[]): Promise<number> {
     const output: ValidationOutput = {
       MODE: paths.MODE,
       FEATURE_DIR: paths.FEATURE_DIR,
-      AVAILABLE_DOCS: docs,
+      AVAILABLE_DOCS: filteredDocs,
       ...(fileContents && { FILE_CONTENTS: fileContents }),
       ...(workflowMode && { WORKFLOW_MODE: workflowMode }),
       // Include implementation paths for multi-repo support
@@ -494,18 +503,9 @@ export async function main(args: string[]): Promise<number> {
     console.log(`FEATURE_DIR:${paths.FEATURE_DIR}`);
     console.log("AVAILABLE_DOCS:");
 
-    // Show status of each potential document with absolute paths
-    console.log(checkFile(paths.FEATURE_SPEC, paths.FEATURE_SPEC));
-    console.log(checkFile(paths.LINKED_REPOS, paths.LINKED_REPOS));
-    console.log(checkDir(paths.CHECKLISTS_DIR, paths.CHECKLISTS_DIR));
-    console.log(checkFile(paths.IMPL_PLAN, paths.IMPL_PLAN));
-    console.log(checkFile(paths.RESEARCH, paths.RESEARCH));
-    console.log(checkFile(paths.DATA_MODEL, paths.DATA_MODEL));
-    console.log(checkFile(paths.QUICKSTART, paths.QUICKSTART));
-    console.log(checkDir(paths.CONTRACTS_DIR, paths.CONTRACTS_DIR));
-
-    if (options.includeTasks) {
-      console.log(checkFile(paths.TASKS, paths.TASKS));
+    // Show all discovered files
+    for (const filePath of filteredDocs) {
+      console.log(`  ✓ ${filePath}`);
     }
   }
 
