@@ -61,10 +61,16 @@ This command supports the following flags for branch-aware task generation (US4)
 
    Use the FEATURE_DIR and AVAILABLE_DOCS values from this JSON.
 
-   **Fallback**: If the comment is not present (backwards compatibility), run:
+   **Fallback**: If the comment is not present (VSCode hook bug), run:
    ```bash
    speck-check-prerequisites --json
    ```
+
+   **Fallback (VSCode hook bug)**: If the virtual command fails with exit code 127, run:
+   ```bash
+   bun ~/.claude/plugins/marketplaces/speck-market/speck/scripts/check-prerequisites.ts --json
+   ```
+   Then manually parse the JSON output to extract FEATURE_DIR, AVAILABLE_DOCS, MODE, and other fields.
 
 3. **Load design documents**:
    Use Read tool to load files from the paths in AVAILABLE_DOCS:

@@ -30,12 +30,18 @@ Execution steps:
    ```
    Use FEATURE_DIR and AVAILABLE_DOCS from this JSON.
 
-   **Fallback**: If the comment is not present (backwards compatibility), run:
+   **Fallback**: If the comment is not present (VSCode hook bug), run:
    ```bash
    speck-check-prerequisites --json --paths-only
    ```
    Parse minimal JSON payload fields: FEATURE_DIR, FEATURE_SPEC.
    If JSON parsing fails, abort and instruct user to re-run `/speck:specify` or verify feature branch environment.
+
+   **Fallback (VSCode hook bug)**: If the virtual command fails with exit code 127, run:
+   ```bash
+   bun ~/.claude/plugins/marketplaces/speck-market/speck/scripts/check-prerequisites.ts --json --paths-only
+   ```
+   Then manually parse the JSON output to extract FEATURE_DIR and FEATURE_SPEC.
 
 2. Load the current spec file:
    - Use Read tool to load spec.md from path in AVAILABLE_DOCS

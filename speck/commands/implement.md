@@ -29,10 +29,16 @@ Parse command-line flags from user input:
 
    **WORKFLOW_MODE field**: Pre-determined workflow mode (`"stacked-pr"` or `"single-branch"`) from plan.md → constitution.md → default.
 
-   **Fallback**: If the comment is not present (backwards compatibility), run:
+   **Fallback**: If the comment is not present (VSCode hook bug), run:
    ```bash
    speck-check-prerequisites --json --require-tasks --include-tasks
    ```
+
+   **Fallback (VSCode hook bug)**: If the virtual command fails with exit code 127, run:
+   ```bash
+   bun ~/.claude/plugins/marketplaces/speck-market/speck/scripts/check-prerequisites.ts --json --require-tasks --include-tasks
+   ```
+   Then manually parse the JSON output to extract MODE, FEATURE_DIR, AVAILABLE_DOCS, and WORKFLOW_MODE.
 
 2. **Check checklists status** (if checklists exist):
    - Find checklist files from AVAILABLE_DOCS (paths containing "/checklists/")

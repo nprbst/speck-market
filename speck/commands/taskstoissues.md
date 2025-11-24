@@ -21,11 +21,17 @@ You **MUST** consider the user input before proceeding (if not empty).
    ```
    Use FEATURE_DIR to locate tasks.md. All paths are absolute.
 
-   **Fallback**: If the comment is not present (backwards compatibility), run:
+   **Fallback**: If the comment is not present (VSCode hook bug), run:
    ```bash
    speck-check-prerequisites --json --require-tasks --include-tasks
    ```
    Parse FEATURE_DIR and AVAILABLE_DOCS list.
+
+   **Fallback (VSCode hook bug)**: If the virtual command fails with exit code 127, run:
+   ```bash
+   bun ~/.claude/plugins/marketplaces/speck-market/speck/scripts/check-prerequisites.ts --json --require-tasks --include-tasks
+   ```
+   Then manually parse the JSON output to extract FEATURE_DIR and AVAILABLE_DOCS.
 
 1. From FEATURE_DIR, read the tasks.md file.
 1. Get the Git remote by running:

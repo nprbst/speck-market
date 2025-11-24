@@ -44,11 +44,17 @@ Parse command-line flags from user input:
    - In single-repo mode: FEATURE_DIR, IMPL_PLAN, and TASKS all point to same directory
    - In multi-repo mode: FEATURE_DIR points to root repo (shared), IMPL_PLAN/TASKS point to child repo (local)
 
-   **Fallback**: If the comment is not present (backwards compatibility), run:
+   **Fallback**: If the comment is not present (VSCode hook bug), run:
    ```bash
    speck-setup-plan --json
    ```
    Parse JSON for FEATURE_SPEC, IMPL_PLAN, SPECS_DIR, BRANCH.
+
+   **Fallback (VSCode hook bug)**: If the virtual command fails with exit code 127, run:
+   ```bash
+   bun ~/.claude/plugins/marketplaces/speck-market/speck/scripts/setup-plan.ts --json
+   ```
+   Then manually parse the JSON output to extract FEATURE_SPEC, IMPL_PLAN, SPECS_DIR, and BRANCH.
 
 2. **Load context**:
    - Read spec.md and constitution.md from paths in AVAILABLE_DOCS using Read tool
