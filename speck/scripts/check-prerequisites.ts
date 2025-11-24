@@ -440,18 +440,12 @@ export async function main(args: string[]): Promise<number> {
     absoluteDocs.push(...localFeatureFiles);
   }
 
-  // 6. Convert to relative paths (relative to REPO_ROOT or SPECK_ROOT depending on location)
+  // 6. Convert to relative paths (all relative to child's REPO_ROOT)
+  // This will create paths like:
+  // - "specs/001-feature/plan.md" for local files
+  // - "../../8-specs/specs/001-feature/spec.md" for root repo files
   const relativeDocs = absoluteDocs.map(absolutePath => {
-    // If file is in REPO_ROOT, make it relative to REPO_ROOT
-    if (absolutePath.startsWith(paths.REPO_ROOT)) {
-      return relative(paths.REPO_ROOT, absolutePath);
-    }
-    // If file is in SPECK_ROOT (root repo), make it relative to SPECK_ROOT
-    if (absolutePath.startsWith(paths.SPECK_ROOT)) {
-      return relative(paths.SPECK_ROOT, absolutePath);
-    }
-    // Fallback: return as-is (shouldn't happen)
-    return absolutePath;
+    return relative(paths.REPO_ROOT, absolutePath);
   });
 
   // 7. Filter out tasks.md unless --include-tasks is set
