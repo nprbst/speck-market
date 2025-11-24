@@ -268,32 +268,6 @@ export async function detectSpeckRoot(): Promise<SpeckConfig> {
     // Verify target exists
     await fs.access(speckRoot);
 
-    // [SPECK-EXTENSION:START] Warn if local specs/ directory exists in multi-repo mode (T062)
-    const localSpecsDir = path.join(repoRoot, 'specs');
-    try {
-      const stats = await fs.stat(localSpecsDir);
-      if (stats.isDirectory() && speckRoot !== repoRoot) {
-        console.warn(
-          'WARNING: Local specs/ directory exists in multi-repo mode\n' +
-          `  Local: ${localSpecsDir}\n` +
-          `  Shared: ${path.join(speckRoot, 'specs')}\n` +
-          'In multi-repo mode, specs are read from the shared speck root.\n' +
-          'The local specs/ directory is ignored.\n' +
-          'To migrate local specs to shared location:\n' +
-          `  1. Copy specs: cp -r ${localSpecsDir}/* ${path.join(speckRoot, 'specs')}/\n` +
-          `  2. Remove local specs: rm -rf ${localSpecsDir}\n`
-        );
-      }
-    } catch (error) {
-      // Local specs/ does not exist - this is expected in multi-repo mode
-      const err = error as NodeJS.ErrnoException;
-      if (err.code !== 'ENOENT') {
-        // Log unexpected errors but don't throw - allow multi-repo mode to work
-        console.warn(`Warning: Could not check local specs/ directory: ${err.message}`);
-      }
-    }
-    // [SPECK-EXTENSION:END]
-
     const config: SpeckConfig = {
       mode: 'multi-repo',
       speckRoot,

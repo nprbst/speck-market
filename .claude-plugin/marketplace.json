@@ -13,7 +13,7 @@
       "name": "speck",
       "source": "./speck",
       "description": "Specification and planning workflow framework for Claude Code",
-      "version": "1.7.15",
+      "version": "1.7.16",
       "author": {
         "name": "Nathan Prabst"
       },
