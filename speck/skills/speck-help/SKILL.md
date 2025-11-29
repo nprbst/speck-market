@@ -1,5 +1,5 @@
 ---
-name: speck-knowledge
+name: speck-help
 description: "Answer questions about Speck specs, plans, tasks, requirements, progress, architecture, user stories, feature status, and constitution. Interprets spec.md, plan.md, tasks.md files. Use when users ask about feature requirements, implementation status, or Speck workflow artifacts."
 ---
 
@@ -13,8 +13,8 @@ description: "Answer questions about Speck specs, plans, tasks, requirements, pr
 
 **Additional Resources**:
 - **[reference.md](reference.md)** - Detailed interpretation rules, file states, error formats
-- **[examples.md](examples.md)** - 9 usage examples showing skill in action
-- **[workflows.md](workflows.md)** - Advanced features (multi-repo, stacked PRs, worktrees)
+- **[examples.md](examples.md)** - Usage examples showing skill in action
+- **[workflows.md](workflows.md)** - Advanced features (multi-repo, worktrees, session handoff)
 
 ---
 
@@ -138,42 +138,7 @@ ERROR: Spec Not Found
 
 ---
 
-### 8. Stacked PR Mode Detection
-
-**Summary**: Detect stacked PR workflow via `.speck/branches.json` or plan.md metadata.
-
-**Key Concepts**:
-- **Detection**: Check for `.speck/branches.json` or `**Workflow Mode**: stacked-pr` in plan.md
-- **Branch metadata**: Tracks branch dependencies, status, PR numbers
-- **Freeform naming**: Supports any branch naming convention (tool-agnostic)
-
-**Query Examples**:
-- "Which branches exist for this feature?" → Read branches.json
-- "What's the dependency order?" → Parse baseBranch chain
-
-**For full details**: See [workflows.md](workflows.md#stacked-pr-mode-detection)
-
----
-
-### 9. Virtual Command Architecture
-
-**Summary**: Speck uses hooks for sub-100ms command execution.
-
-**Key Concepts**:
-- **PreToolUse hook**: Intercepts commands, routes to CLI handler
-- **PrePromptSubmit hook**: Pre-loads context, validates prerequisites
-- **Dual-mode**: Works in Claude Code (hooks) and CLI (`bun run`)
-- **Performance**: <100ms latency via prerequisite caching
-
-**Query Examples**:
-- "Why are commands so fast?" → Explain hook-based architecture
-- "What's the virtual command pattern?" → Explain hooks + dual-mode
-
-**For full details**: See [workflows.md](workflows.md#virtual-command-architecture)
-
----
-
-### 10. Worktree Mode Detection
+### 8. Worktree Mode Detection
 
 **Summary**: Detect Git worktree integration for isolated parallel development.
 
@@ -188,6 +153,36 @@ ERROR: Spec Not Found
 - "What's the worktree config?" → Read config.json
 
 **For full details**: See [workflows.md](workflows.md#worktree-mode-detection)
+
+---
+
+### 9. Session Handoff
+
+**Summary**: Automatic context transfer when creating new feature worktrees.
+
+**Key Concepts**:
+- **Handoff document**: `.speck/handoff.md` written to new worktrees
+- **SessionStart hook**: Automatically loads handoff context when Claude session starts
+- **Self-cleanup**: Hook archives handoff after loading and removes itself from settings
+- **Context transfer**: Feature context, spec location, and pending tasks transferred to new session
+
+**How It Works**:
+1. When `/speck:specify` creates a new worktree, it writes `.speck/handoff.md`
+2. It also configures `.claude/settings.json` with a SessionStart hook
+3. When a new Claude session starts in the worktree, the hook fires
+4. The hook reads handoff.md and injects context via `hookSpecificOutput.additionalContext`
+5. After loading, the hook archives the handoff file and removes itself
+
+**Query Examples**:
+- "What's in the handoff document?" → Read `.speck/handoff.md` in worktree
+- "Did the session handoff work?" → Check for `.speck/handoff.done.md` (archived)
+- "How do I create a feature with handoff?" → Use `/speck:specify "Feature description"`
+
+**Handoff Document Contents**:
+- Feature name and spec location
+- Repository context (single/multi-repo mode)
+- Pending implementation tasks
+- Relevant file paths and references
 
 ---
 
@@ -254,11 +249,12 @@ This skill is for **reading and understanding** existing Speck artifacts. When u
 | `/speck:specify` | Create or update feature specification (with optional worktree creation) | "Run /speck:specify to create a new spec" |
 | `/speck:clarify` | Resolve ambiguities and add missing sections | "Run /speck:clarify to resolve [NEEDS CLARIFICATION] markers" |
 | `/speck:plan` | Generate implementation plan from spec | "Run /speck:plan to create the implementation plan" |
-| `/speck:tasks` | Generate actionable task breakdown (with optional branch filtering) | "Run /speck:tasks to create a task list" |
+| `/speck:tasks` | Generate actionable task breakdown | "Run /speck:tasks to create a task list" |
 | `/speck:analyze` | Check cross-artifact consistency and quality | "Run /speck:analyze to validate spec/plan/tasks consistency" |
 | `/speck:implement` | Execute tasks from tasks.md | "Run /speck:implement to start implementation" |
 | `/speck:link` | Link child repository to multi-repo root | "Run /speck:link ../root to connect this repo to multi-repo root" |
-| `/speck:branch` | Manage stacked PR branches with dependency tracking | "Run /speck:branch create to create a stacked branch" |
+| `/speck:init` | Install Speck CLI globally via symlink | "Run /speck:init to install the speck command" |
+| `/speck:help` | Load speck-help skill for natural language questions | "Run /speck:help to ask questions about Speck" |
 | `/speck:env` | Check Speck environment and configuration | "Run /speck:env to see current repo mode (single/multi-repo)" |
 
 **Worktree Flags for `/speck:specify`**:
@@ -266,17 +262,6 @@ This skill is for **reading and understanding** existing Speck artifacts. When u
 - `--no-ide`: Skip IDE auto-launch
 - `--no-deps`: Skip dependency installation
 - `--reuse-worktree`: Reuse existing worktree if present
-
-**Branch-Aware Tasks (`/speck:tasks`)**:
-- `--branch <name>`: Generate tasks for specific branch only
-- `--stories <US1,US2>`: Filter tasks by user story labels
-- Example: `/speck:tasks --branch 007-multi-repo --stories US1,US2`
-
-**Stacked PR Commands (`/speck:branch`)**:
-- `create <name> [--base <base-branch>]`: Create new stacked branch
-- `list [--all]`: Display branch stack with dependencies
-- `status`: Health check for stack (merged branches, rebase warnings)
-- `import`: Auto-detect git branch relationships, populate branches.json
 
 **When to Suggest Commands**:
 - **Missing spec.md** → Suggest `/speck:specify "Feature description"`
@@ -306,7 +291,7 @@ This skill enables natural language interaction with Speck workflow artifacts:
 
 **Additional Resources**:
 - **[reference.md](reference.md)** - Detailed rules, workflows, edge cases
-- **[examples.md](examples.md)** - 9 usage examples
-- **[workflows.md](workflows.md)** - Advanced features (multi-repo, stacked PRs, worktrees)
+- **[examples.md](examples.md)** - Usage examples
+- **[workflows.md](workflows.md)** - Advanced features (multi-repo, worktrees, session handoff)
 
 **Goal**: Reduce need for manual file reading and slash command usage by 80%, enabling developers to ask natural questions and get accurate answers about their Speck features.

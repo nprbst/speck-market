@@ -35,12 +35,21 @@ import {
   type FeaturePaths,
 } from "./common/paths";
 import { ExitCode } from "./contracts/cli-interface";
+import {
+  formatJsonOutput,
+  formatHookOutput,
+  readHookInput,
+  detectInputMode,
+  detectOutputMode,
+  type OutputMode,
+} from "./lib/output-formatter";
 
 /**
  * CLI options for check-prerequisites
  */
 interface CheckPrerequisitesOptions {
   json: boolean;
+  hook: boolean;
   requireTasks: boolean;
   includeTasks: boolean;
   pathsOnly: boolean;
@@ -126,6 +135,7 @@ function collectAllFiles(dirPath: string, fileList: string[] = []): string[] {
 function parseArgs(args: string[]): CheckPrerequisitesOptions {
   return {
     json: args.includes("--json"),
+    hook: args.includes("--hook"),
     requireTasks: args.includes("--require-tasks"),
     includeTasks: args.includes("--include-tasks"),
     pathsOnly: args.includes("--paths-only"),
@@ -147,7 +157,8 @@ function showHelp(): void {
 Consolidated prerequisite checking for Spec-Driven Development workflow.
 
 OPTIONS:
-  --json                   Output in JSON format
+  --json                   Output in JSON format (structured JSON envelope)
+  --hook                   Output hook-formatted response for Claude Code hooks
   --require-tasks          Require tasks.md to exist (for implementation phase)
   --include-tasks          Include tasks.md in AVAILABLE_DOCS list
   --paths-only             Only output path variables (no prerequisite validation)
@@ -158,12 +169,20 @@ OPTIONS:
   --include-workflow-mode  Include workflow mode in JSON output
   --help, -h               Show this help message
 
+OUTPUT MODES:
+  Default (human): Human-readable text output
+  --json: Structured JSON with { ok, result, error, meta } envelope
+  --hook: Hook output for Claude Code integration (context injection)
+
 EXAMPLES:
   # Check task prerequisites (plan.md required)
   bun .speck/scripts/check-prerequisites.ts --json
 
   # Check implementation prerequisites (plan.md + tasks.md required)
   bun .speck/scripts/check-prerequisites.ts --json --require-tasks --include-tasks
+
+  # For Claude Code hook integration
+  bun .speck/scripts/check-prerequisites.ts --hook --include-workflow-mode
 
   # Validate code quality before feature completion
   bun .speck/scripts/check-prerequisites.ts --validate-code-quality
@@ -202,9 +221,10 @@ function outputPathsOnly(paths: FeaturePaths, jsonMode: boolean): void {
 /**
  * Check for unknown options
  */
-function checkForUnknownOptions(args: string[]): void {
+function checkForUnknownOptions(args: string[], _outputMode: OutputMode): string | null {
   const validOptions = [
     "--json",
+    "--hook",
     "--require-tasks",
     "--include-tasks",
     "--paths-only",
@@ -219,11 +239,11 @@ function checkForUnknownOptions(args: string[]): void {
   for (const arg of args) {
     if (arg.startsWith("--") || arg.startsWith("-")) {
       if (!validOptions.includes(arg)) {
-        console.error(`ERROR: Unknown option '${arg}'. Use --help for usage information.`);
-        process.exit(ExitCode.USER_ERROR);
+        return `Unknown option '${arg}'. Use --help for usage information.`;
       }
     }
   }
+  return null;
 }
 
 /**
@@ -344,24 +364,64 @@ function determineWorkflowMode(featureDir: string, repoRoot: string): string {
 }
 
 /**
+ * Output error in the appropriate format
+ */
+function outputError(
+  code: string,
+  message: string,
+  recovery: string[],
+  outputMode: OutputMode,
+  startTime: number
+): void {
+  if (outputMode === "json") {
+    const output = formatJsonOutput({
+      success: false,
+      error: { code, message, recovery },
+      command: "check-prerequisites",
+      startTime,
+    });
+    console.log(JSON.stringify(output));
+  } else if (outputMode === "hook") {
+    // For hook mode errors, output human-readable to stderr
+    console.error(`ERROR: ${message}`);
+    recovery.forEach(r => console.error(r));
+  } else {
+    console.error(`ERROR: ${message}`);
+    recovery.forEach(r => console.error(r));
+  }
+}
+
+/**
  * Main function
  */
 export async function main(args: string[]): Promise<number> {
+  const startTime = Date.now();
+  const options = parseArgs(args);
+  const outputMode = detectOutputMode(options);
+
   // DEPRECATION WARNING: This individual script is deprecated
   // Prerequisite checks are now automatically performed by PrePromptSubmit hook
   // For manual checks, use: bun .speck/scripts/speck.ts env
-  if (!args.includes("--json") && process.stdout.isTTY) {
+  if (outputMode === "human" && process.stdout.isTTY) {
     console.warn("\x1b[33m⚠️  DEPRECATION WARNING: Direct invocation deprecated. Prerequisites are now auto-checked via PrePromptSubmit hook.\x1b[0m\n");
   }
 
   // Check for unknown options first
-  checkForUnknownOptions(args);
-
-  const options = parseArgs(args);
+  const unknownOptionError = checkForUnknownOptions(args, outputMode);
+  if (unknownOptionError) {
+    outputError("INVALID_ARGS", unknownOptionError, [], outputMode, startTime);
+    return ExitCode.USER_ERROR;
+  }
 
   if (options.help) {
     showHelp();
     return ExitCode.SUCCESS;
+  }
+
+  // Read hook input if in hook mode (for future use)
+  if (detectInputMode(options) === "hook") {
+    // Hook input can be read here for context-aware behavior
+    await readHookInput();
   }
 
   // Get feature paths and validate branch
@@ -371,6 +431,13 @@ export async function main(args: string[]): Promise<number> {
   // Skip branch validation if --skip-feature-check is set
   if (!options.skipFeatureCheck) {
     if (!(await checkFeatureBranch(paths.CURRENT_BRANCH, hasGitRepo, paths.REPO_ROOT))) {
+      outputError(
+        "NOT_ON_FEATURE_BRANCH",
+        `Not on a feature branch: ${paths.CURRENT_BRANCH}`,
+        ["Switch to a feature branch (e.g., git checkout 001-feature-name)"],
+        outputMode,
+        startTime
+      );
       return ExitCode.USER_ERROR;
     }
   }
@@ -383,22 +450,37 @@ export async function main(args: string[]): Promise<number> {
 
   // Validate required directories and files
   if (!existsSync(paths.FEATURE_DIR)) {
-    console.error(`ERROR: Feature directory not found: ${paths.FEATURE_DIR}`);
-    console.error("Run /speck.specify first to create the feature structure.");
+    outputError(
+      "FEATURE_DIR_NOT_FOUND",
+      `Feature directory not found: ${paths.FEATURE_DIR}`,
+      ["Run /speck.specify first to create the feature structure."],
+      outputMode,
+      startTime
+    );
     return ExitCode.USER_ERROR;
   }
 
   // Check plan.md unless --skip-plan-check is set
   if (!options.skipPlanCheck && !existsSync(paths.IMPL_PLAN)) {
-    console.error(`ERROR: plan.md not found in ${paths.FEATURE_DIR}`);
-    console.error("Run /speck.plan first to create the implementation plan.");
+    outputError(
+      "PLAN_NOT_FOUND",
+      `plan.md not found in ${paths.FEATURE_DIR}`,
+      ["Run /speck.plan first to create the implementation plan."],
+      outputMode,
+      startTime
+    );
     return ExitCode.USER_ERROR;
   }
 
   // Check for tasks.md if required
   if (options.requireTasks && !existsSync(paths.TASKS)) {
-    console.error(`ERROR: tasks.md not found in ${paths.FEATURE_DIR}`);
-    console.error("Run /speck.tasks first to create the task list.");
+    outputError(
+      "TASKS_NOT_FOUND",
+      `tasks.md not found in ${paths.FEATURE_DIR}`,
+      ["Run /speck.tasks first to create the task list."],
+      outputMode,
+      startTime
+    );
     return ExitCode.USER_ERROR;
   }
 
@@ -484,9 +566,9 @@ export async function main(args: string[]): Promise<number> {
     }
   }
 
-  // Determine workflow mode if requested
+  // Determine workflow mode (always include for hook mode, otherwise only if requested)
   let workflowMode: string | undefined;
-  if (options.includeWorkflowMode) {
+  if (options.includeWorkflowMode || outputMode === "hook") {
     workflowMode = determineWorkflowMode(paths.FEATURE_DIR, paths.REPO_ROOT);
   }
 
@@ -494,32 +576,52 @@ export async function main(args: string[]): Promise<number> {
   if (options.validateCodeQuality) {
     const qualityResult = await validateCodeQuality(paths.REPO_ROOT);
     if (!qualityResult.passed) {
-      console.error("\n" + qualityResult.message);
-      console.error("\nConstitution Principle IX requires zero typecheck errors and zero lint errors/warnings.");
-      console.error("Fix all issues before marking the feature complete.\n");
+      outputError(
+        "CODE_QUALITY_FAILED",
+        qualityResult.message,
+        ["Constitution Principle IX requires zero typecheck errors and zero lint errors/warnings.", "Fix all issues before marking the feature complete."],
+        outputMode,
+        startTime
+      );
       return ExitCode.USER_ERROR;
     }
-    if (!options.json) {
+    if (outputMode === "human") {
       console.log("\n" + qualityResult.message + "\n");
     }
   }
 
-  // Output results
-  if (options.json) {
-    const output: ValidationOutput = {
-      MODE: paths.MODE,
-      FEATURE_DIR: paths.FEATURE_DIR,
-      AVAILABLE_DOCS: filteredDocs,
-      ...(fileContents && { FILE_CONTENTS: fileContents }),
-      ...(workflowMode && { WORKFLOW_MODE: workflowMode }),
-      // Include implementation paths for multi-repo support
-      IMPL_PLAN: paths.IMPL_PLAN,
-      TASKS: paths.TASKS,
-      REPO_ROOT: paths.REPO_ROOT,
-    };
+  // Build the validation result data
+  const validationData: ValidationOutput = {
+    MODE: paths.MODE,
+    FEATURE_DIR: paths.FEATURE_DIR,
+    AVAILABLE_DOCS: filteredDocs,
+    ...(fileContents && { FILE_CONTENTS: fileContents }),
+    ...(workflowMode && { WORKFLOW_MODE: workflowMode }),
+    // Include implementation paths for multi-repo support
+    IMPL_PLAN: paths.IMPL_PLAN,
+    TASKS: paths.TASKS,
+    REPO_ROOT: paths.REPO_ROOT,
+  };
+
+  // Output results based on mode
+  if (outputMode === "json") {
+    const output = formatJsonOutput({
+      success: true,
+      data: validationData,
+      command: "check-prerequisites",
+      startTime,
+    });
     console.log(JSON.stringify(output));
-  } else{
-    // Text output
+  } else if (outputMode === "hook") {
+    // Hook mode: output context for Claude Code hook injection
+    const hookContext = buildHookContext(validationData);
+    const hookOutput = formatHookOutput({
+      hookType: "UserPromptSubmit",
+      context: hookContext,
+    });
+    console.log(JSON.stringify(hookOutput));
+  } else {
+    // Human-readable text output
     console.log(`FEATURE_DIR:${paths.FEATURE_DIR}`);
     console.log("AVAILABLE_DOCS:");
 
@@ -530,6 +632,26 @@ export async function main(args: string[]): Promise<number> {
   }
 
   return ExitCode.SUCCESS;
+}
+
+/**
+ * Build hook context string for Claude Code injection
+ */
+function buildHookContext(data: ValidationOutput): string {
+  const lines = [
+    "<!-- SPECK_PREREQ_CONTEXT",
+    JSON.stringify({
+      MODE: data.MODE,
+      FEATURE_DIR: data.FEATURE_DIR,
+      AVAILABLE_DOCS: data.AVAILABLE_DOCS,
+      WORKFLOW_MODE: data.WORKFLOW_MODE,
+      IMPL_PLAN: data.IMPL_PLAN,
+      TASKS: data.TASKS,
+      REPO_ROOT: data.REPO_ROOT,
+    }),
+    "-->",
+  ];
+  return lines.join("\n");
 }
 
 /**

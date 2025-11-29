@@ -1,6 +1,6 @@
-# Speck Knowledge Usage Examples
+# Speck Help Usage Examples
 
-Practical examples showing how the speck-knowledge skill interprets and answers questions about Speck artifacts.
+Practical examples showing how the speck-help skill interprets and answers questions about Speck artifacts.
 
 **Referenced from**: SKILL.md
 
@@ -154,77 +154,36 @@ Response:
 
 ---
 
-## Example 7: Stacked PR Branch Status
+## Example 7: Session Handoff
 ```
-User: Which branches exist for feature 007?
+User: Did my session handoff work?
 
 Skill Actions:
-1. Load .speck/branches.json
-2. Filter branches by specId "007-multi-repo-monorepo-support"
-3. Parse branch relationships and status
+1. Check for .speck/handoff.done.md (archived handoff)
+2. If found, handoff was successful
+3. If not found, check for .speck/handoff.md (pending handoff)
 
 Response:
-  Feature 007-multi-repo-monorepo-support has 2 stacked branches:
+  ✓ Session handoff completed successfully.
 
-  Branch Stack:
-  main
-  └── 007-multi-repo (PR #5, merged)
-      └── nprbst/db-layer (active, no PR yet)
+  Evidence:
+  - Found .speck/handoff.done.md (archived handoff file)
+  - Handoff was loaded when Claude session started
 
-  Details:
-  - 007-multi-repo: Base branch for feature, merged to main
-  - nprbst/db-layer: Active development, stacked on 007-multi-repo
+  Context Transferred:
+  - Feature: 015-scope-simplification
+  - Spec Location: specs/015-scope-simplification/
+  - Repository Mode: single-repo
+  - Pending Tasks: Phase 7 tasks
 
-  Workflow Mode: stacked-pr (from plan.md)
-
-  Next steps:
-  - Create PR for nprbst/db-layer with base 007-multi-repo
-  - Use /speck.branch create to add more branches
+  Note: The handoff document has been archived. This is normal -
+  the SessionStart hook archives handoff.md after loading and
+  removes itself from .claude/settings.json.
 ```
 
 ---
 
-## Example 8: Virtual Command Performance
-```
-User: Why are Speck commands so fast?
-
-Skill Actions:
-1. Explain virtual command pattern
-2. Describe hook-based architecture
-3. Detail performance characteristics
-
-Response:
-  Speck commands execute in <100ms due to the virtual command pattern:
-
-  Architecture:
-  1. PrePromptSubmit hook runs on every user message
-     - Automatically checks prerequisites (feature dir, git status)
-     - Pre-loads context and injects into prompt
-     - No manual prerequisite checks needed
-
-  2. PreToolUse hook intercepts command execution
-     - Routes speck-* commands to unified CLI handler
-     - Path-independent execution (no hardcoded paths)
-     - Returns transformed command with context
-
-  Performance Benefits:
-  - Hook routing: <100ms latency
-  - Prerequisite caching: 30% faster execution
-  - Context pre-loading: No redundant checks
-
-  Dual-Mode Execution:
-  - Works in Claude Code (via hooks)
-  - Works in CLI (via bun run .speck/scripts/*.ts)
-  - Same codebase, different I/O (JSON vs terminal)
-
-  Examples:
-  - /speck.env: Instant environment check (prerequisites cached)
-  - /speck.branch list: Fast branch listing (context pre-loaded)
-```
-
----
-
-## Example 9: Worktree Configuration
+## Example 8: Worktree Configuration
 ```
 User: What's the worktree config for this feature?
 

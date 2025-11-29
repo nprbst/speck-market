@@ -268,18 +268,6 @@ If spec.md has Requirements but missing Success Criteria:
 **Input**: Feature specification from /specs/NNN-feature/spec.md
 ```
 
-**Workflow Mode Metadata** (optional):
-```
-**Workflow Mode**: stacked-pr
-```
-or
-```
-**Workflow Mode**: single-branch
-```
-- `stacked-pr`: Feature uses stacked PR workflow with multiple branches
-- `single-branch`: Traditional single branch workflow (default if not specified)
-- When `stacked-pr`, expect `.speck/branches.json` in repository root
-
 **Mandatory Sections**:
 
 #### Summary

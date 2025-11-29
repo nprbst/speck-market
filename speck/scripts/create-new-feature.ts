@@ -31,16 +31,36 @@ import path from "node:path";
 import { $ } from "bun";
 import { ExitCode } from "./contracts/cli-interface";
 import { getTemplatesDir, detectSpeckRoot } from "./common/paths";
+import {
+  formatJsonOutput,
+  formatHookOutput,
+  detectOutputMode,
+  type OutputMode,
+} from "./lib/output-formatter";
+import { loadConfig } from "./worktree/config";
+import { constructWorktreePath } from "./worktree/naming";
+import { writeWorktreeHandoff } from "./worktree/handoff";
+import { launchIDE } from "./worktree/ide-launch";
+import {
+  readBranches,
+  writeBranches,
+  createBranchEntry,
+  addBranchEntry,
+} from "./common/branch-mapper";
 
 /**
  * CLI options for create-new-feature
  */
 interface CreateFeatureOptions {
   json: boolean;
+  hook: boolean;
   shortName?: string;
   number?: number;
+  branch?: string;      // T081: Custom branch name (non-standard, recorded in branches.json)
   sharedSpec: boolean;  // T064-T066: Create spec at speckRoot with local symlinks
   localSpec: boolean;   // T067: Create spec locally in child repo
+  noWorktree: boolean;  // T053: Disable worktree creation even if config enables it
+  worktree: boolean;    // Force worktree creation even if config disables it
   help: boolean;
   featureDescription: string;
 }
@@ -52,16 +72,28 @@ interface CreateFeatureOutput {
   BRANCH_NAME: string;
   SPEC_FILE: string;
   FEATURE_NUM: string;
+  WORKTREE_PATH?: string;
 }
+
+/**
+ * Parse result type for command line arguments
+ */
+type ParseResult =
+  | { success: true; options: CreateFeatureOptions }
+  | { success: false; error: string };
 
 /**
  * Parse command line arguments
  */
-function parseArgs(args: string[]): CreateFeatureOptions {
+function parseArgs(args: string[]): ParseResult {
   const options: CreateFeatureOptions = {
     json: false,
+    hook: false,
+    branch: undefined,
     sharedSpec: false,
     localSpec: false,
+    noWorktree: false,
+    worktree: false,
     help: false,
     featureDescription: "",
   };
@@ -75,30 +107,43 @@ function parseArgs(args: string[]): CreateFeatureOptions {
     if (arg === "--json") {
       options.json = true;
       i++;
+    } else if (arg === "--hook") {
+      options.hook = true;
+      i++;
     } else if (arg === "--short-name") {
       if (i + 1 >= args.length || args[i + 1]?.startsWith("--")) {
-        console.error("Error: --short-name requires a value");
-        process.exit(ExitCode.USER_ERROR);
+        return { success: false, error: "--short-name requires a value" };
       }
       options.shortName = args[i + 1]!;
       i += 2;
     } else if (arg === "--number") {
       if (i + 1 >= args.length || args[i + 1]?.startsWith("--")) {
-        console.error("Error: --number requires a value");
-        process.exit(ExitCode.USER_ERROR);
+        return { success: false, error: "--number requires a value" };
       }
       const num = parseInt(args[i + 1]!, 10);
       if (isNaN(num)) {
-        console.error("Error: --number requires a numeric value");
-        process.exit(ExitCode.USER_ERROR);
+        return { success: false, error: "--number requires a numeric value" };
       }
       options.number = num;
+      i += 2;
+    } else if (arg === "--branch") {
+      // T081: Custom branch name (non-standard, recorded in branches.json)
+      if (i + 1 >= args.length || args[i + 1]?.startsWith("--")) {
+        return { success: false, error: "--branch requires a value" };
+      }
+      options.branch = args[i + 1]!;
       i += 2;
     } else if (arg === "--shared-spec") {
       options.sharedSpec = true;
       i++;
     } else if (arg === "--local-spec") {
       options.localSpec = true;
+      i++;
+    } else if (arg === "--no-worktree") {
+      options.noWorktree = true;
+      i++;
+    } else if (arg === "--worktree") {
+      options.worktree = true;
       i++;
     } else if (arg === "--help" || arg === "-h") {
       options.help = true;
@@ -110,7 +155,7 @@ function parseArgs(args: string[]): CreateFeatureOptions {
   }
 
   options.featureDescription = positionalArgs.join(" ");
-  return options;
+  return { success: true, options };
 }
 
 /**
@@ -118,19 +163,60 @@ function parseArgs(args: string[]): CreateFeatureOptions {
  */
 function showHelp(): void {
   const scriptName = path.basename(process.argv[1]!);
-  console.log(`Usage: ${scriptName} [--json] [--short-name <name>] [--number N] [--shared-spec | --local-spec] <feature_description>
+  console.log(`Usage: ${scriptName} [--json] [--hook] [--short-name <name>] [--number N] [--branch <name>] [--shared-spec | --local-spec] [--worktree | --no-worktree] <feature_description>
 
 Options:
-  --json              Output in JSON format
+  --json              Output in JSON format (structured JSON envelope)
+  --hook              Output hook-formatted response for Claude Code hooks
   --short-name <name> Provide a custom short name (2-4 words) for the branch
   --number N          Specify branch number manually (overrides auto-detection)
+  --branch <name>     Use a custom branch name (non-standard, recorded in branches.json)
   --shared-spec       Create spec at speckRoot (multi-repo shared spec with local symlinks)
   --local-spec        Create spec locally in child repo (single-repo or child-only spec)
+  --worktree          Create a worktree with handoff artifacts (overrides config)
+  --no-worktree       Disable worktree creation (overrides config)
   --help, -h          Show this help message
+
+Worktree Mode:
+  When worktree mode is enabled (via config or --worktree), this command:
+  1. Creates a branch and worktree atomically (no checkout switching)
+  2. Writes session handoff artifacts to the worktree
+  3. Launches IDE in the new worktree
+
+Non-Standard Branch Names:
+  When --branch is used with a name that doesn't follow the NNN-name pattern,
+  the branch-to-spec mapping is recorded in .speck/branches.json for later lookup.
 
 Examples:
   ${scriptName} 'Add user authentication system' --short-name 'user-auth'
-  ${scriptName} 'Implement OAuth2 integration for API' --number 5 --shared-spec`);
+  ${scriptName} 'Implement OAuth2 integration for API' --number 5 --shared-spec
+  ${scriptName} 'Fix login bug' --worktree
+  ${scriptName} 'My feature' --branch 'nprbst/custom-feature'`);
+}
+
+/**
+ * Output error in the appropriate format
+ */
+function outputError(
+  code: string,
+  message: string,
+  outputMode: OutputMode,
+  startTime: number,
+  recovery?: string[]
+): void {
+  if (outputMode === "json") {
+    const output = formatJsonOutput({
+      success: false,
+      error: { code, message, recovery },
+      command: "create-new-feature",
+      startTime,
+    });
+    console.log(JSON.stringify(output));
+  } else if (outputMode === "hook") {
+    console.error(`ERROR: ${message}`);
+  } else {
+    console.error(`Error: ${message}`);
+  }
 }
 
 /**
@@ -304,7 +390,25 @@ function generateBranchName(description: string): string {
  * Main function
  */
 export async function main(args: string[]): Promise<number> {
-  const options = parseArgs(args);
+  const startTime = Date.now();
+  const parseResult = parseArgs(args);
+
+  // Handle parse errors (need to detect outputMode first from raw args)
+  if (!parseResult.success) {
+    const hasJsonFlag = args.includes("--json");
+    const hasHookFlag = args.includes("--hook");
+    const outputMode = detectOutputMode({ json: hasJsonFlag, hook: hasHookFlag });
+    outputError(
+      "INVALID_ARGS",
+      parseResult.error,
+      outputMode,
+      startTime
+    );
+    return ExitCode.USER_ERROR;
+  }
+
+  const options = parseResult.options;
+  const outputMode = detectOutputMode(options);
 
   if (options.help) {
     showHelp();
@@ -312,7 +416,13 @@ export async function main(args: string[]): Promise<number> {
   }
 
   if (!options.featureDescription) {
-    console.error("Usage: create-new-feature [--json] [--short-name <name>] [--number N] <feature_description>");
+    outputError(
+      "MISSING_DESCRIPTION",
+      "Feature description is required",
+      outputMode,
+      startTime,
+      ["Provide a description: create-new-feature '<feature description>'"]
+    );
     return ExitCode.USER_ERROR;
   }
 
@@ -328,7 +438,12 @@ export async function main(args: string[]): Promise<number> {
     const scriptDir = import.meta.dir;
     const foundRoot = findRepoRoot(scriptDir);
     if (!foundRoot) {
-      console.error("Error: Could not determine repository root. Please run this script from within the repository.");
+      outputError(
+        "REPO_NOT_FOUND",
+        "Could not determine repository root. Please run this script from within the repository.",
+        outputMode,
+        startTime
+      );
       return ExitCode.USER_ERROR;
     }
     repoRoot = foundRoot;
@@ -352,52 +467,224 @@ export async function main(args: string[]): Promise<number> {
   mkdirSync(specsDir, { recursive: true });
   // [SPECK-EXTENSION:END]
 
-  // Generate branch name
-  let branchSuffix: string;
-  if (options.shortName) {
-    branchSuffix = cleanBranchName(options.shortName);
-  } else {
-    branchSuffix = generateBranchName(options.featureDescription);
-  }
+  // [SPECK-EXTENSION:START] T081: Non-standard branch name support
+  // Generate branch name with support for custom non-standard names
+  let branchName: string;
+  let specId: string; // The spec directory name (always NNN-short-name format)
+  let featureNum: string; // Numeric prefix for output (e.g., "015")
+  let isNonStandardBranch = false;
 
-  // Determine branch number
-  let branchNumber: number;
-  if (options.number !== undefined) {
-    branchNumber = options.number;
-  } else if (hasGit) {
-    branchNumber = await checkExistingBranches(branchSuffix, specsDir);
-  } else {
-    const highest = getHighestFromSpecs(specsDir);
-    branchNumber = highest + 1;
-  }
+  if (options.branch) {
+    // T081: Custom branch name provided - use as-is
+    branchName = options.branch;
+    isNonStandardBranch = !/^\d{3}-/.test(branchName);
 
-  const featureNum = branchNumber.toString().padStart(3, "0");
-  let branchName = `${featureNum}-${branchSuffix}`;
-
-  // GitHub enforces a 244-byte limit on branch names
-  const maxBranchLength = 244;
-  if (branchName.length > maxBranchLength) {
-    const maxSuffixLength = maxBranchLength - 4; // 3 digits + hyphen
-    const truncatedSuffix = branchSuffix.substring(0, maxSuffixLength).replace(/-$/, "");
-
-    console.error(`[specify] Warning: Branch name exceeded GitHub's 244-byte limit`);
-    console.error(`[specify] Original: ${branchName} (${branchName.length} bytes)`);
-
-    branchName = `${featureNum}-${truncatedSuffix}`;
-    console.error(`[specify] Truncated to: ${branchName} (${branchName.length} bytes)`);
-  }
-
-  // Create git branch if we have git
-  if (hasGit) {
-    try {
-      await $`git checkout -b ${branchName}`;
-    } catch (error) {
-      console.error(`Error: Failed to create git branch: ${String(error)}`);
-      return ExitCode.USER_ERROR;
+    // Still need to generate spec ID (directory name)
+    let branchSuffix: string;
+    if (options.shortName) {
+      branchSuffix = cleanBranchName(options.shortName);
+    } else {
+      branchSuffix = generateBranchName(options.featureDescription);
     }
+
+    let branchNumber: number;
+    if (options.number !== undefined) {
+      branchNumber = options.number;
+    } else if (hasGit) {
+      branchNumber = await checkExistingBranches(branchSuffix, specsDir);
+    } else {
+      const highest = getHighestFromSpecs(specsDir);
+      branchNumber = highest + 1;
+    }
+
+    featureNum = branchNumber.toString().padStart(3, "0");
+    specId = `${featureNum}-${branchSuffix}`;
   } else {
+    // Standard branch name generation
+    let branchSuffix: string;
+    if (options.shortName) {
+      branchSuffix = cleanBranchName(options.shortName);
+    } else {
+      branchSuffix = generateBranchName(options.featureDescription);
+    }
+
+    // Determine branch number
+    let branchNumber: number;
+    if (options.number !== undefined) {
+      branchNumber = options.number;
+    } else if (hasGit) {
+      branchNumber = await checkExistingBranches(branchSuffix, specsDir);
+    } else {
+      const highest = getHighestFromSpecs(specsDir);
+      branchNumber = highest + 1;
+    }
+
+    featureNum = branchNumber.toString().padStart(3, "0");
+    branchName = `${featureNum}-${branchSuffix}`;
+
+    // GitHub enforces a 244-byte limit on branch names
+    const maxBranchLength = 244;
+    if (branchName.length > maxBranchLength) {
+      const maxSuffixLength = maxBranchLength - 4; // 3 digits + hyphen
+      const truncatedSuffix = branchSuffix.substring(0, maxSuffixLength).replace(/-$/, "");
+
+      console.error(`[specify] Warning: Branch name exceeded GitHub's 244-byte limit`);
+      console.error(`[specify] Original: ${branchName} (${branchName.length} bytes)`);
+
+      branchName = `${featureNum}-${truncatedSuffix}`;
+      console.error(`[specify] Truncated to: ${branchName} (${branchName.length} bytes)`);
+    }
+
+    specId = branchName; // For standard branches, spec ID equals branch name
+  }
+
+  // T081: Record non-standard branch name in branches.json
+  if (isNonStandardBranch && hasGit) {
+    try {
+      const branchMapping = await readBranches(repoRoot);
+      const entry = createBranchEntry(branchName, specId);
+      const updatedMapping = addBranchEntry(branchMapping, entry);
+      await writeBranches(repoRoot, updatedMapping);
+
+      if (outputMode === "human") {
+        console.log(`[speck] Recorded branch mapping: ${branchName} → ${specId}`);
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      // Non-fatal: warn but continue
+      console.error(`[speck] Warning: Failed to record branch mapping: ${errorMessage}`);
+    }
+  }
+  // [SPECK-EXTENSION:END]
+
+  // [SPECK-EXTENSION:START] T048, T053, T054: Worktree + Handoff Integration
+  // Determine if worktree mode should be used
+  let worktreePath: string | undefined;
+  let useWorktree = false;
+  const warnings: string[] = [];
+
+  if (hasGit) {
+    // Load worktree config to check if worktree mode is enabled
+    const worktreeConfig = await loadConfig(repoRoot);
+    const configEnablesWorktree = worktreeConfig.worktree.enabled;
+
+    // T053: --no-worktree and --worktree flags override config
+    if (options.noWorktree) {
+      useWorktree = false;
+    } else if (options.worktree) {
+      useWorktree = true;
+    } else {
+      useWorktree = configEnablesWorktree;
+    }
+
+    if (useWorktree) {
+      // T048: Use atomic `git worktree add -b` for worktree mode
+      // This creates branch + worktree without changing current checkout
+      try {
+        worktreePath = await constructWorktreePath(repoRoot, worktreeConfig.worktree, branchName);
+
+        // Create branch and worktree atomically
+        const result = await $`git worktree add -b ${branchName} ${worktreePath} HEAD`.nothrow();
+        if (result.exitCode !== 0) {
+          throw new Error(`git worktree add failed: ${result.stderr.toString()}`);
+        }
+
+        if (outputMode === "human") {
+          console.log(`[speck] Created worktree at: ${worktreePath}`);
+        }
+
+        // T048a-d, T054: Write handoff artifacts (graceful degradation)
+        try {
+          // Extract feature title from description
+          const featureTitle = options.featureDescription.charAt(0).toUpperCase() +
+            options.featureDescription.slice(1);
+
+          // Calculate relative spec path from worktree
+          // T081: Use specId for spec directory (always NNN-short-name format)
+          const relativeSpecDir = path.join("specs", specId);
+          const relativeSpecPath = path.join(relativeSpecDir, "spec.md");
+
+          writeWorktreeHandoff(worktreePath, {
+            featureName: featureTitle,
+            branchName,
+            specPath: relativeSpecPath,
+            context: options.featureDescription,
+            status: "not-started",
+          });
+
+          if (outputMode === "human") {
+            console.log(`[speck] Written handoff artifacts to worktree`);
+          }
+        } catch (error) {
+          // T054: Non-fatal - worktree still works without handoff
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          warnings.push(`Failed to write handoff artifacts: ${errorMessage}`);
+          if (outputMode === "human") {
+            console.error(`[speck] Warning: Failed to write handoff artifacts: ${errorMessage}`);
+          }
+        }
+
+        // Launch IDE in worktree if configured
+        if (worktreeConfig.worktree.ide.autoLaunch) {
+          try {
+            const ideResult = launchIDE({
+              worktreePath,
+              editor: worktreeConfig.worktree.ide.editor,
+              newWindow: worktreeConfig.worktree.ide.newWindow,
+            });
+
+            if (!ideResult.success) {
+              warnings.push(`IDE launch failed: ${ideResult.error}`);
+              if (outputMode === "human") {
+                console.error(`[speck] Warning: IDE launch failed: ${ideResult.error}`);
+              }
+            }
+          } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            warnings.push(`IDE launch error: ${errorMessage}`);
+          }
+        }
+      } catch (error) {
+        // Worktree creation failed - fall back to regular checkout
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        if (outputMode === "human") {
+          console.error(`[speck] Warning: Worktree creation failed, falling back to branch checkout: ${errorMessage}`);
+        }
+        warnings.push(`Worktree creation failed: ${errorMessage}`);
+        worktreePath = undefined;
+        useWorktree = false;
+
+        // Try regular branch checkout
+        try {
+          await $`git checkout -b ${branchName}`;
+        } catch (checkoutError) {
+          outputError(
+            "GIT_BRANCH_FAILED",
+            `Failed to create git branch: ${String(checkoutError)}`,
+            outputMode,
+            startTime
+          );
+          return ExitCode.USER_ERROR;
+        }
+      }
+    } else {
+      // Regular branch checkout (non-worktree mode)
+      try {
+        await $`git checkout -b ${branchName}`;
+      } catch (error) {
+        outputError(
+          "GIT_BRANCH_FAILED",
+          `Failed to create git branch: ${String(error)}`,
+          outputMode,
+          startTime
+        );
+        return ExitCode.USER_ERROR;
+      }
+    }
+  } else if (outputMode === "human") {
     console.error(`[specify] Warning: Git repository not detected; skipped branch creation for ${branchName}`);
   }
+  // [SPECK-EXTENSION:END]
 
   // [SPECK-EXTENSION:START] T073-T075: Phase 9 - Branch Management (Multi-Repo)
   // T073: Create spec-named branch in parent repo when creating shared spec
@@ -462,7 +749,8 @@ export async function main(args: string[]): Promise<number> {
 
   // [SPECK-EXTENSION:START] T064-T066: Handle shared vs local spec creation
   // Create feature directory at the determined location (shared or local)
-  const featureDir = path.join(specsDir, branchName);
+  // T081: Use specId for directory (always NNN-short-name format, even with custom branch)
+  const featureDir = path.join(specsDir, specId);
   mkdirSync(featureDir, { recursive: true });
 
   // Copy template to the spec location
@@ -478,7 +766,7 @@ export async function main(args: string[]): Promise<number> {
   // T065-T066: If shared spec in multi-repo mode, create local directory and symlink
   if (options.sharedSpec && config.mode === 'multi-repo') {
     // T065: Create local specs/NNN-feature/ directory in child repo
-    const localFeatureDir = path.join(repoRoot, "specs", branchName);
+    const localFeatureDir = path.join(repoRoot, "specs", specId);
     mkdirSync(localFeatureDir, { recursive: true });
 
     // T066: Symlink parent spec.md into child's local specs/NNN-feature/
@@ -512,18 +800,36 @@ export async function main(args: string[]): Promise<number> {
   // Set SPECIFY_FEATURE environment variable (note: this only affects this process)
   process.env.SPECIFY_FEATURE = branchName;
 
-  // Output results
-  if (options.json) {
-    const output: CreateFeatureOutput = {
-      BRANCH_NAME: branchName,
-      SPEC_FILE: specFile,
-      FEATURE_NUM: featureNum,
-    };
+  // Build output data
+  const outputData: CreateFeatureOutput = {
+    BRANCH_NAME: branchName,
+    SPEC_FILE: specFile,
+    FEATURE_NUM: featureNum,
+    WORKTREE_PATH: worktreePath,
+  };
+
+  // Output results based on mode
+  if (outputMode === "json") {
+    const output = formatJsonOutput({
+      success: true,
+      data: outputData,
+      command: "create-new-feature",
+      startTime,
+    });
     console.log(JSON.stringify(output));
+  } else if (outputMode === "hook") {
+    const hookOutput = formatHookOutput({
+      hookType: "UserPromptSubmit",
+      context: `<!-- SPECK_FEATURE_CREATED\n${JSON.stringify(outputData)}\n-->`,
+    });
+    console.log(JSON.stringify(hookOutput));
   } else {
     console.log(`BRANCH_NAME: ${branchName}`);
     console.log(`SPEC_FILE: ${specFile}`);
     console.log(`FEATURE_NUM: ${featureNum}`);
+    if (worktreePath) {
+      console.log(`WORKTREE_PATH: ${worktreePath}`);
+    }
     console.log(`SPECIFY_FEATURE environment variable set to: ${branchName}`);
   }
 

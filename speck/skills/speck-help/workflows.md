@@ -1,6 +1,6 @@
 # Speck Advanced Workflows
 
-Advanced features from features 007-012: Multi-repo support, stacked PRs, virtual commands, and worktree integration.
+Advanced features: Multi-repo support, worktree integration, and session handoff.
 
 **Referenced from**: SKILL.md
 
@@ -9,10 +9,9 @@ Advanced features from features 007-012: Multi-repo support, stacked PRs, virtua
 ## Table of Contents
 
 1. [Multi-Repo Mode Detection](#multi-repo-mode-detection)
-2. [Stacked PR Mode Detection](#stacked-pr-mode-detection)
-3. [Virtual Command Architecture](#virtual-command-architecture)
-4. [Worktree Mode Detection](#worktree-mode-detection)
-5. [Hook Failures and Fallback Methods](#hook-failures-and-fallback-methods)
+2. [Worktree Mode Detection](#worktree-mode-detection)
+3. [Session Handoff](#session-handoff)
+4. [Hook Failures and Fallback Methods](#hook-failures-and-fallback-methods)
 
 ---
 
@@ -51,145 +50,6 @@ specs/ -> (via symlink resolution)
 - "Is this a multi-repo setup?" → Check for `.speck/root` symlink
 - "What's the parent spec?" → Read `**Parent Spec**` from spec.md metadata
 - "Where's the constitution?" → Check local `.speck/constitution.md` or follow symlink to root
-
-**Multi-Repo + Stacked PRs**:
-When combining both modes:
-- Each child repo MAY use stacked PRs independently
-- Branch naming remains per-repo: `NNN-feature-name` or custom naming
-- Feature numbers MUST still be unique across all child repos
-- `.speck/branches.json` lives in each child repo (not shared)
-
----
-
-## Stacked PR Mode Detection
-
-Features MAY use stacked PR workflow where each user story or logical unit gets its own branch/PR:
-
-**Detection Method**:
-- Check for `.speck/branches.json` file in repository root
-- Check for `**Workflow Mode**: stacked-pr` in plan.md metadata
-- If present → feature uses stacked PRs
-
-**Branch Metadata Structure** (`.speck/branches.json`):
-```json
-{
-  "schemaVersion": "1.0.0",
-  "branches": [
-    {
-      "branchName": "007-multi-repo",
-      "baseBranch": "main",
-      "specId": "007-multi-repo-monorepo-support",
-      "prNumber": 123,
-      "status": "active",
-      "createdAt": "2025-11-18T10:00:00Z",
-      "updatedAt": "2025-11-18T10:00:00Z"
-    },
-    {
-      "branchName": "nprbst/db-layer",
-      "baseBranch": "007-multi-repo",
-      "specId": "007-multi-repo-monorepo-support",
-      "status": "active",
-      "createdAt": "2025-11-19T14:30:00Z",
-      "updatedAt": "2025-11-19T14:30:00Z"
-    }
-  ],
-  "specIndex": {
-    "007-multi-repo-monorepo-support": ["007-multi-repo", "nprbst/db-layer"]
-  }
-}
-```
-
-**Branch Status Values**:
-- `active`: Branch exists, work in progress
-- `submitted`: PR created, under review
-- `merged`: PR merged, branch may still exist
-- `abandoned`: Branch/PR abandoned
-
-**Naming Conventions**:
-- Supports **freeform naming** (not limited to `NNN-feature-usX` pattern)
-- Examples: `007-multi-repo`, `nprbst/db-layer`, `feature/authentication`
-- Tool-agnostic: Works with Graphite, GitHub Stack, or manual git workflow
-
-**Branch-Aware Task Generation**:
-- Command: `/speck.tasks --branch <name> --stories <US1,US2>`
-- Generates subset of tasks for specific branch
-- Output: `tasks-<branch-name>.md` or `tasks.md` (if no --branch flag)
-- Tasks filtered by user story labels matching `--stories` parameter
-
-**User Query Examples**:
-- "Which branches exist for this feature?" → Read `.speck/branches.json`, filter by `specId`
-- "What's the dependency order?" → Parse `baseBranch` chain (e.g., main → 007-multi-repo → nprbst/db-layer)
-- "Is this using stacked PRs?" → Check workflow mode in plan.md or presence of branches.json
-
-**Interrupt-Resume PR Suggestion Pattern**:
-When creating branches, `/speck.branch create` may exit with code 2 (suggestion pending):
-1. Script outputs JSON to stderr: `{"type": "pr-suggestion", "branch": "...", "suggestedTitle": "...", ...}`
-2. Claude Code agent prompts user: "Create PR now? (yes/no/skip)"
-3. Re-invokes with `--create-pr` or `--skip-pr-prompt` based on user response
-4. Allows workflow customization without blocking automation
-
----
-
-## Virtual Command Architecture
-
-Speck uses virtual commands for sub-100ms execution via Claude Code hooks:
-
-**Virtual Command Pattern**:
-- Commands appear as `/speck.*` slash commands in Claude Code
-- Actual implementation in `.speck/scripts/*.ts` and hook handlers
-- Hooks handle prerequisite checking and context pre-loading
-- Example commands: `/speck.specify`, `/speck.plan`, `/speck.tasks`, `/speck.branch`
-
-**Hook Types**:
-
-1. **PreToolUse hook**: Runs when virtual command is invoked (before tool execution)
-   - Intercepts commands matching pattern `speck-*` (e.g., `speck-env`, `speck-branch`)
-   - Reads JSON from stdin: `{"tool_input": {"command": "speck-branch list"}}`
-   - Routes to unified CLI handler (`speck.ts`)
-   - Returns JSON to stdout with `permissionDecision: "allow"` and transformed command
-   - Enables path-independent command execution
-
-2. **PrePromptSubmit hook**: Runs on every user message (before slash command expansion)
-   - Detects if user is in feature directory
-   - Runs prerequisite checks automatically
-   - Pre-loads context and injects into prompt as markdown comment
-   - Enables sub-100ms command execution (prerequisites already satisfied)
-   - Slash commands parse injected context directly (no manual `check-prerequisites`)
-
-**Command Registry Pattern**:
-Centralized registry maps command names to handlers:
-```typescript
-// .speck/scripts/commands/index.ts
-export const registry: CommandRegistry = {
-  "env": { handler: envHandler, description: "Check environment" },
-  "branch": { handler: branchHandler, description: "Manage stacked branches" }
-}
-```
-
-**Dual-Mode Execution**:
-Commands work identically in two modes:
-1. **Claude Code mode**: Invoked via hooks, JSON stdin/stdout
-2. **CLI mode**: Invoked via `bun run .speck/scripts/<name>.ts`, terminal I/O
-
-Detection logic:
-```typescript
-const isHookMode = args.includes('--hook') || !process.stdin.isTTY
-```
-
-**Performance Characteristics**:
-- Hook routing: <100ms latency (SC-003 from feature 010)
-- Prerequisite caching: 30% faster execution via PrePromptSubmit context injection
-- No manual prerequisite checks needed in slash commands (pre-validated)
-
-**When Explaining Commands**:
-- Commands execute instantly because hooks pre-validate context
-- No need for manual directory checking or path resolution
-- Works in both Claude Code and direct CLI (`bun run`)
-
-**User Query Examples**:
-- "Why are commands so fast?" → Explain hook-based prerequisite checking and context injection
-- "What's the virtual command pattern?" → Explain hooks + dual-mode execution
-- "How do slash commands work?" → Explain PreToolUse routing and PrePromptSubmit context loading
 
 ---
 
@@ -278,34 +138,86 @@ After worktree creation:
 
 ---
 
+## Session Handoff
+
+When creating a new feature worktree, Speck automatically sets up context transfer for new Claude sessions.
+
+**Purpose**:
+Transfer feature context (spec location, pending tasks, repository mode) to new Claude sessions that start in the worktree, so Claude immediately knows what to work on.
+
+**How It Works**:
+
+1. **Worktree Creation** (`/speck.specify`):
+   - Creates new worktree with `git worktree add -b <branch> <path> HEAD`
+   - Writes `.speck/handoff.md` to the worktree (contains feature context)
+   - Writes `.claude/settings.json` with SessionStart hook configuration
+   - Writes `.claude/scripts/handoff.sh` shell script to execute
+   - Optionally writes `.vscode/tasks.json` for auto-opening Claude panel
+
+2. **SessionStart Hook** (fires when Claude session starts):
+   - `.claude/settings.json` contains hook pointing to `.claude/scripts/handoff.sh`
+   - Hook reads `.speck/handoff.md` and returns JSON with `hookSpecificOutput.additionalContext`
+   - Claude receives the handoff content as context in its first message
+
+3. **Self-Cleanup** (after handoff loads):
+   - Hook archives `.speck/handoff.md` → `.speck/handoff.done.md`
+   - Hook removes itself from `.claude/settings.json` to prevent re-firing
+   - One-shot operation: handoff happens once per worktree creation
+
+**Handoff Document Structure** (`.speck/handoff.md`):
+```markdown
+# Session Handoff
+
+**Feature**: 015-scope-simplification
+**Spec Location**: ../main-repo/specs/015-scope-simplification/
+**Repository Mode**: single-repo
+
+## Context
+
+This worktree was created for implementing the "Scope Simplification" feature.
+
+## Pending Tasks
+
+- Phase 7: User Story 5 - Developer Gets Help via /speck.help
+  - T068: Rename skill directory
+  - T069: Update skill frontmatter
+  ...
+
+## Relevant Files
+
+- spec.md: Feature specification
+- plan.md: Implementation plan
+- tasks.md: Task breakdown
+```
+
+**Graceful Degradation**:
+- If handoff document creation fails, worktree is still created (non-fatal)
+- If SessionStart hook fails to fire, user can manually read `.speck/handoff.md`
+- If hook self-cleanup fails, handoff may fire again (no harm, just redundant)
+
+**User Query Examples**:
+- "What's in the handoff document?" → Read `.speck/handoff.md` in worktree
+- "Did session handoff work?" → Check for `.speck/handoff.done.md` (archived file)
+- "Why does Claude know about my feature?" → Explain SessionStart hook + handoff document
+- "Can I disable handoff?" → Use `--no-worktree` flag with `/speck.specify`
+
+---
+
 ## Hook Failures and Fallback Methods
 
 When VSCode Claude Extension hooks fail (known bug), slash commands won't receive prerequisite context automatically. This section explains how to troubleshoot and work around hook failures.
 
 **Common Symptoms**:
 - Missing `SPECK_PREREQ_CONTEXT` comment in slash command prompts
-- Virtual commands fail with exit code 127 ("command not found")
 - Slash commands ask you to run prerequisite checks manually
 
 **Root Cause**:
-VSCode Claude Extension has a bug that prevents PreToolUse and UserPromptSubmit hooks from executing for installed plugins. This breaks:
-1. **UserPromptSubmit hook**: Prerequisite context not injected into prompts
-2. **PreToolUse hook**: Virtual commands (`speck-*`) not intercepted
+VSCode Claude Extension has a bug that prevents UserPromptSubmit hooks from executing for installed plugins. This breaks:
+- **UserPromptSubmit hook**: Prerequisite context not injected into prompts
 
-**Fallback Method 1: Virtual Commands**
+**Fallback Method: Direct Script Execution**
 
-If SPECK_PREREQ_CONTEXT is missing, try running the virtual command:
-
-```bash
-speck-check-prerequisites --json [options]
-speck-setup-plan --json
-```
-
-These virtual commands work when PreToolUse hook is functional.
-
-**Fallback Method 2: Direct Script Execution**
-
-If virtual commands fail with exit code 127, run scripts directly from the installed plugin:
+If hooks are not working, run scripts directly from the installed plugin or CLI:
 
 ```bash
 bun ~/.claude/plugins/marketplaces/speck-market/speck/scripts/<script-name>.ts --json [options]
