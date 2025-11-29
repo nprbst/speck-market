@@ -7138,7 +7138,7 @@ var init_config_schema = __esm(() => {
     newWindow: exports_external.boolean().default(true)
   }).default({});
   WorktreeConfigSchema = exports_external.object({
-    enabled: exports_external.boolean().default(false),
+    enabled: exports_external.boolean().default(true),
     worktreePath: exports_external.string().default(".speck/worktrees"),
     branchPrefix: exports_external.string().optional(),
     ide: IDEConfigSchema,
@@ -7150,7 +7150,7 @@ var init_config_schema = __esm(() => {
     worktree: WorktreeConfigSchema
   });
   DEFAULT_WORKTREE_CONFIG = {
-    enabled: false,
+    enabled: true,
     worktreePath: ".speck/worktrees",
     ide: {
       autoLaunch: false,
@@ -8538,6 +8538,7 @@ import { existsSync as existsSync7, mkdirSync as mkdirSync3, lstatSync, readlink
 import { join as join4, dirname as dirname2, resolve as resolve2 } from "path";
 import { homedir } from "os";
 import { parseArgs as parseArgs3 } from "util";
+import { createInterface } from "readline";
 function findGitRoot() {
   try {
     const result = Bun.spawnSync(["git", "rev-parse", "--show-toplevel"], {
@@ -8616,6 +8617,67 @@ function isRegularFile(path6) {
     return false;
   }
 }
+async function promptYesNo(question, defaultYes) {
+  const rl = createInterface({
+    input: process.stdin,
+    output: process.stdout
+  });
+  const hint = defaultYes ? "(Y/n)" : "(y/N)";
+  return new Promise((resolve3) => {
+    rl.question(`${question} ${hint} `, (answer) => {
+      rl.close();
+      const normalized = answer.trim().toLowerCase();
+      if (normalized === "") {
+        resolve3(defaultYes);
+      } else {
+        resolve3(normalized === "y" || normalized === "yes");
+      }
+    });
+  });
+}
+async function promptIDE(defaultEditor) {
+  const rl = createInterface({
+    input: process.stdin,
+    output: process.stdout
+  });
+  const options = IDE_EDITORS.join("/");
+  return new Promise((resolve3) => {
+    rl.question(`Which IDE editor? (${options}) [${defaultEditor}] `, (answer) => {
+      rl.close();
+      const normalized = answer.trim().toLowerCase();
+      if (normalized === "" || !IDE_EDITORS.includes(normalized)) {
+        resolve3(defaultEditor);
+      } else {
+        resolve3(normalized);
+      }
+    });
+  });
+}
+async function createSpeckConfig(speckDir, isInteractive) {
+  const configPath = join4(speckDir, "config.json");
+  if (existsSync7(configPath)) {
+    return false;
+  }
+  const config = { ...DEFAULT_SPECK_CONFIG };
+  if (isInteractive) {
+    console.log(`
+\uD83D\uDCCB Configure Speck preferences:
+`);
+    config.worktree.enabled = await promptYesNo("Enable worktree mode? (creates isolated directories for each feature)", true);
+    config.worktree.ide.autoLaunch = await promptYesNo("Auto-launch IDE when creating features?", false);
+    if (config.worktree.ide.autoLaunch) {
+      config.worktree.ide.editor = await promptIDE("vscode");
+    }
+    console.log("");
+  }
+  try {
+    writeFileSync2(configPath, JSON.stringify(config, null, 2) + `
+`);
+    return true;
+  } catch {
+    return false;
+  }
+}
 function configurePluginPermissions(repoRoot) {
   const settingsPath = join4(repoRoot, ".claude", "settings.local.json");
   try {
@@ -8650,7 +8712,7 @@ function configurePluginPermissions(repoRoot) {
     return 0;
   }
 }
-function runInit(options) {
+async function runInit(options) {
   const bootstrapPath = getBootstrapPath();
   const inPath = isInPath();
   const pathInstructions = inPath ? undefined : getPathInstructions();
@@ -8674,12 +8736,15 @@ Then run 'speck init' again.`,
   let speckDirCreated = false;
   let speckDirPath;
   let needsConstitution = false;
+  let configCreated = false;
   const speckResult = createSpeckDirectory(gitRoot);
   if (speckResult) {
     speckDirCreated = speckResult.created;
     speckDirPath = speckResult.path;
     const constitutionPath = join4(speckResult.path, "memory", "constitution.md");
     needsConstitution = !existsSync7(constitutionPath);
+    const isInteractive = !options.json && process.stdin.isTTY;
+    configCreated = await createSpeckConfig(speckResult.path, isInteractive);
   }
   const permissionsConfigured = configurePluginPermissions(gitRoot);
   if (!existsSync7(bootstrapPath)) {
@@ -8700,6 +8765,9 @@ Then run 'speck init' again.`,
       if (speckDirCreated) {
         alreadyInstalledMessages.push(`\u2713 Created .speck/ directory`);
       }
+      if (configCreated) {
+        alreadyInstalledMessages.push(`\u2713 Created .speck/config.json with your preferences`);
+      }
       alreadyInstalledMessages.push(`\u2713 Speck CLI already installed at ${SYMLINK_PATH}`);
       if (permissionsConfigured > 0) {
         alreadyInstalledMessages.push(`\u2713 Added ${permissionsConfigured} permission(s) to .claude/settings.local.json`);
@@ -8715,6 +8783,7 @@ Then run 'speck init' again.`,
         pathInstructions,
         speckDirCreated,
         speckDirPath,
+        configCreated,
         permissionsConfigured,
         nextStep: needsConstitution ? "Run /speck:constitution to set up your project principles." : undefined
       };
@@ -8762,6 +8831,9 @@ Then run 'speck init' again.`,
   } else if (speckDirPath) {
     messages.push(`\u2713 .speck/ directory exists at ${speckDirPath}`);
   }
+  if (configCreated) {
+    messages.push(`\u2713 Created .speck/config.json with your preferences`);
+  }
   messages.push(`\u2713 Speck CLI installed to ${SYMLINK_PATH}`);
   if (permissionsConfigured > 0) {
     messages.push(`\u2713 Added ${permissionsConfigured} permission(s) to .claude/settings.local.json`);
@@ -8776,6 +8848,7 @@ Then run 'speck init' again.`,
     pathInstructions,
     speckDirCreated,
     speckDirPath,
+    configCreated,
     permissionsConfigured,
     nextStep: needsConstitution ? "Run /speck:constitution to set up your project principles." : undefined
   };
@@ -8791,6 +8864,7 @@ function formatOutput(result, options) {
         alreadyInstalled: result.alreadyInstalled,
         speckDirCreated: result.speckDirCreated,
         speckDirPath: result.speckDirPath,
+        configCreated: result.configCreated,
         permissionsConfigured: result.permissionsConfigured
       },
       message: result.message,
@@ -8826,14 +8900,16 @@ async function main4(args) {
     force: values.force ?? false,
     json: values.json ?? false
   };
-  const result = runInit(options);
+  const result = await runInit(options);
   console.log(formatOutput(result, options));
   return result.success ? 0 : 1;
 }
-var LOCAL_BIN_DIR, SYMLINK_PATH, SPECK_SUBDIRS, DEFAULT_ALLOWED_PERMISSIONS;
+var LOCAL_BIN_DIR, SYMLINK_PATH, IDE_EDITORS, SPECK_SUBDIRS, DEFAULT_ALLOWED_PERMISSIONS;
 var init_init = __esm(() => {
+  init_config_schema();
   LOCAL_BIN_DIR = join4(homedir(), ".local", "bin");
   SYMLINK_PATH = join4(LOCAL_BIN_DIR, "speck");
+  IDE_EDITORS = ["vscode", "cursor", "webstorm", "idea", "pycharm"];
   SPECK_SUBDIRS = [
     "memory",
     "scripts"
