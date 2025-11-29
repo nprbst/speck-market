@@ -608,6 +608,14 @@ async function main(args) {
   }
   const paths = await getFeaturePaths();
   const hasGitRepo = paths.HAS_GIT === "true";
+  if (!hasGitRepo) {
+    outputError("NO_GIT_REPO", "Not in a git repository", [
+      "Speck requires a git repository to function.",
+      "Initialize a git repository first: git init",
+      "Or navigate to an existing git repository."
+    ], outputMode, startTime);
+    return 1 /* USER_ERROR */;
+  }
   if (!options.skipFeatureCheck) {
     if (!await checkFeatureBranch(paths.CURRENT_BRANCH, hasGitRepo, paths.REPO_ROOT)) {
       outputError("NOT_ON_FEATURE_BRANCH", `Not on a feature branch: ${paths.CURRENT_BRANCH}`, ["Switch to a feature branch (e.g., git checkout 001-feature-name)"], outputMode, startTime);

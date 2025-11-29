@@ -2977,6 +2977,14 @@ async function main(args) {
   }
   const paths = await getFeaturePaths();
   const hasGitRepo = paths.HAS_GIT === "true";
+  if (!hasGitRepo) {
+    outputError("NO_GIT_REPO", "Not in a git repository", [
+      "Speck requires a git repository to function.",
+      "Initialize a git repository first: git init",
+      "Or navigate to an existing git repository."
+    ], outputMode, startTime);
+    return 1 /* USER_ERROR */;
+  }
   if (!options.skipFeatureCheck) {
     if (!await checkFeatureBranch(paths.CURRENT_BRANCH, hasGitRepo, paths.REPO_ROOT)) {
       outputError("NOT_ON_FEATURE_BRANCH", `Not on a feature branch: ${paths.CURRENT_BRANCH}`, ["Switch to a feature branch (e.g., git checkout 001-feature-name)"], outputMode, startTime);
@@ -8607,17 +8615,31 @@ function runInit(options) {
   const inPath = isInPath();
   const pathInstructions = inPath ? undefined : getPathInstructions();
   const gitRoot = findGitRoot();
+  if (!gitRoot) {
+    return {
+      success: false,
+      symlinkPath: SYMLINK_PATH,
+      targetPath: bootstrapPath,
+      inPath,
+      message: `Error: Not in a git repository.
+
+Speck requires a git repository to function. Please either:
+  1. Initialize a git repository: git init
+  2. Navigate to an existing git repository
+
+Then run 'speck init' again.`,
+      pathInstructions
+    };
+  }
   let speckDirCreated = false;
   let speckDirPath;
   let needsConstitution = false;
-  if (gitRoot) {
-    const speckResult = createSpeckDirectory(gitRoot);
-    if (speckResult) {
-      speckDirCreated = speckResult.created;
-      speckDirPath = speckResult.path;
-      const constitutionPath = join4(speckResult.path, "memory", "constitution.md");
-      needsConstitution = !existsSync7(constitutionPath);
-    }
+  const speckResult = createSpeckDirectory(gitRoot);
+  if (speckResult) {
+    speckDirCreated = speckResult.created;
+    speckDirPath = speckResult.path;
+    const constitutionPath = join4(speckResult.path, "memory", "constitution.md");
+    needsConstitution = !existsSync7(constitutionPath);
   }
   if (!existsSync7(bootstrapPath)) {
     return {

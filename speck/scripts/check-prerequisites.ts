@@ -428,6 +428,22 @@ export async function main(args: string[]): Promise<number> {
   const paths = await getFeaturePaths();
   const hasGitRepo = paths.HAS_GIT === "true";
 
+  // Require git repository for all Speck operations
+  if (!hasGitRepo) {
+    outputError(
+      "NO_GIT_REPO",
+      "Not in a git repository",
+      [
+        "Speck requires a git repository to function.",
+        "Initialize a git repository first: git init",
+        "Or navigate to an existing git repository.",
+      ],
+      outputMode,
+      startTime
+    );
+    return ExitCode.USER_ERROR;
+  }
+
   // Skip branch validation if --skip-feature-check is set
   if (!options.skipFeatureCheck) {
     if (!(await checkFeatureBranch(paths.CURRENT_BRANCH, hasGitRepo, paths.REPO_ROOT))) {
