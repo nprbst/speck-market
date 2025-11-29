@@ -41,13 +41,12 @@ while [[ -L "$SOURCE" ]]; do
 done
 SCRIPT_DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
 
-# Look for bundled CLI first, fall back to TypeScript source for development
-if [[ -f "${SCRIPT_DIR}/../../.speck/dist/speck-cli.js" ]]; then
-    ENTRYPOINT="${SCRIPT_DIR}/../../.speck/dist/speck-cli.js"
-elif [[ -f "${SCRIPT_DIR}/index.ts" ]]; then
-    ENTRYPOINT="${SCRIPT_DIR}/index.ts"
-else
-    echo "Error: Could not find speck CLI entrypoint"
+# Find the bundled CLI relative to bootstrap.sh
+# Plugin structure: speck/src/cli/bootstrap.sh → speck/dist/speck-cli.js
+ENTRYPOINT="${SCRIPT_DIR}/../../dist/speck-cli.js"
+
+if [[ ! -f "$ENTRYPOINT" ]]; then
+    echo "Error: Could not find speck CLI at: $ENTRYPOINT"
     exit 1
 fi
 

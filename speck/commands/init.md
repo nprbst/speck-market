@@ -24,9 +24,13 @@ This command initializes Speck in the current repository and optionally installs
 
 ### Run Initialization
 
+First, check if `speck` is already available in PATH:
+
 ```bash
-bun $HOME/.claude/plugins/marketplaces/speck-market/speck/dist/speck-cli.js init
+which speck && speck init || bun $HOME/.claude/plugins/marketplaces/speck-market/speck/dist/speck-cli.js init
 ```
+
+This is idempotent - if `speck` is already installed and in PATH, it will use the installed version. Otherwise, it falls back to the plugin path for initial installation.
 
 ### Options
 
