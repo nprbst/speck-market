@@ -1,22 +1,425 @@
 #!/usr/bin/env bun
 // @bun
-var p=Object.create;var{getPrototypeOf:c,defineProperty:y,getOwnPropertyNames:n}=Object;var i=Object.prototype.hasOwnProperty;var s=(Y,V,H)=>{H=Y!=null?p(c(Y)):{};let X=V||!Y||!Y.__esModule?y(H,"default",{value:Y,enumerable:!0}):H;for(let J of n(Y))if(!i.call(X,J))y(X,J,{get:()=>Y[J],enumerable:!0});return X};var r=import.meta.require;import{existsSync as $,readdirSync as P,readFileSync as E,statSync as QY}from"fs";import{join as A,basename as VY,relative as XY}from"path";import{existsSync as z}from"fs";import{readdirSync as D}from"fs";import q from"fs/promises";import K from"path";var{$:M}=globalThis.Bun;async function a(){try{return(await M`git rev-parse --show-toplevel`.quiet()).text().trim()}catch{return process.cwd()}}var _=null;async function o(){if(_)return _;let Y=await a(),V=K.join(Y,".speck","root");try{if(!(await q.lstat(V)).isSymbolicLink()){console.warn(`WARNING: .speck/root exists but is not a symlink
-Expected: symlink to speck root directory
-Found: regular file/directory
-Falling back to single-repo mode.
-To enable multi-repo: mv .speck/root .speck/root.backup && /speck.link <path>`);let U={mode:"single-repo",speckRoot:Y,repoRoot:Y,specsDir:K.join(Y,"specs")};return _=U,U}let X=await q.realpath(V),J=["/","/etc","/usr","/bin","/sbin","/System","/Library"],Q=process.env.HOME||process.env.USERPROFILE||"";if(J.some((U)=>X===U||X.startsWith(U+"/")))throw Error(`Security: .speck/root symlink points to system directory: ${X}
-Speck root must be a user-owned project directory.
-Fix: rm .speck/root && /speck.link <safe-project-path>`);if(Q&&X===K.dirname(Q))throw Error(`Security: .speck/root symlink points above home directory: ${X}
-Fix: rm .speck/root && /speck.link <project-path-within-home>`);await q.access(X);let Z={mode:"multi-repo",speckRoot:X,repoRoot:Y,specsDir:K.join(X,"specs")};return _=Z,Z}catch(H){let X=H;if(X.code==="ENOENT"){if((await e(Y)).length>0){let U={mode:"multi-repo",speckRoot:Y,repoRoot:Y,specsDir:K.join(Y,"specs")};return _=U,U}let Z={mode:"single-repo",speckRoot:Y,repoRoot:Y,specsDir:K.join(Y,"specs")};return _=Z,Z}if(X.code==="ELOOP")throw Error(`Multi-repo configuration broken: .speck/root contains circular reference
-Fix: rm .speck/root && /speck.link <valid-path>`);let J=await q.readlink(V).catch(()=>"unknown");throw Error(`Multi-repo configuration broken: .speck/root \u2192 ${J} (does not exist)
-Fix:
-  1. Remove broken symlink: rm .speck/root
-  2. Link to correct location: /speck.link <path-to-speck-root>`)}}async function e(Y){let V=[];try{let H=await q.readdir(Y,{withFileTypes:!0});for(let X of H)if(X.isSymbolicLink()&&X.name.startsWith(".speck-link-")){let J=K.join(Y,X.name);try{let Q=await q.realpath(J);if(["/","/etc","/usr","/bin","/sbin","/System","/Library"].some((W)=>Q===W||Q.startsWith(W+"/"))){console.warn(`Security: Skipping ${X.name} - points to system directory: ${Q}`);continue}let U=K.join(Q,".git");try{await q.access(U),V.push(Q)}catch{console.warn(`Warning: ${X.name} points to non-git directory: ${Q}`)}}catch(Q){let Z=Q instanceof Error?Q.message:String(Q);console.warn(`Warning: Broken symlink ${X.name}: ${Z}`)}}}catch(H){if(H.code!=="ENOENT")throw H}return V}async function t(Y){if(process.env.SPECIFY_FEATURE)return process.env.SPECIFY_FEATURE;try{return(await M`git rev-parse --abbrev-ref HEAD`.quiet()).text().trim()}catch{let V=K.join(Y,"specs");if(z(V)){let H="",X=0,J=D(V,{withFileTypes:!0});for(let Q of J)if(Q.isDirectory()){let Z=Q.name.match(/^(\d{3})-/);if(Z&&Z[1]){let U=parseInt(Z[1],10);if(U>X)X=U,H=Q.name}}if(H)return H}return"main"}}async function YY(){try{let Y=process.cwd(),V=K.join(Y,".git");if(z(V))return!0;return await M`git rev-parse --show-toplevel`.quiet(),!0}catch{return!1}}async function S(Y,V,H){if(!V)return console.error("[specify] Warning: Git repository not detected; skipped branch validation"),!0;let X=K.join(H,".speck","branches.json");if(z(X))try{let J=await q.readFile(X,"utf-8"),Q=JSON.parse(J);if(Q.branches&&Array.isArray(Q.branches)){if(Q.branches.some((U)=>U.name===Y))return!0}}catch{}if(!/^\d{3}-/.test(Y))return console.error(`ERROR: Not on a feature branch. Current branch: ${Y}`),console.error("Feature branches should be named like: 001-feature-name"),!1;return!0}async function HY(Y,V,H){let X=K.join(H,".speck","branches.json");if(z(X))try{let U=await q.readFile(X,"utf-8"),W=JSON.parse(U);if(W.branches&&Array.isArray(W.branches)){let T=W.branches.find((w)=>w.name===V);if(T&&T.specId)return K.join(Y,T.specId)}}catch{}let J=V.match(/^(\d{3})-/);if(!J)return K.join(Y,V);let Q=J[1],Z=[];if(z(Y)){let U=D(Y,{withFileTypes:!0});for(let W of U)if(W.isDirectory()&&W.name.startsWith(`${Q}-`))Z.push(W.name)}if(Z.length===0)return K.join(Y,V);else if(Z.length===1&&Z[0])return K.join(Y,Z[0]);else return console.error(`ERROR: Multiple spec directories found with prefix '${Q}': ${Z.join(", ")}`),console.error("Please ensure only one spec directory exists per numeric prefix."),K.join(Y,V)}async function k(){let Y=await o(),V=await t(Y.repoRoot),H=await YY(),X=await HY(Y.specsDir,V,Y.repoRoot),J=K.basename(X),Q=K.join(Y.repoRoot,"specs",J);return{MODE:Y.mode,SPECK_ROOT:Y.speckRoot,SPECS_DIR:Y.specsDir,REPO_ROOT:Y.repoRoot,CURRENT_BRANCH:V,HAS_GIT:H?"true":"false",FEATURE_DIR:X,FEATURE_SPEC:K.join(X,"spec.md"),CHECKLISTS_DIR:K.join(X,"checklists"),LINKED_REPOS:K.join(X,"linked-repos.md"),IMPL_PLAN:K.join(Q,"plan.md"),TASKS:K.join(Q,"tasks.md"),RESEARCH:K.join(Q,"research.md"),DATA_MODEL:K.join(Q,"data-model.md"),QUICKSTART:K.join(Q,"quickstart.md"),CONTRACTS_DIR:K.join(Q,"contracts")}}function F(Y,V=[]){if(!$(Y))return V;try{let H=P(Y);for(let X of H){let J=A(Y,X);try{let Q=QY(J);if(Q.isDirectory())F(J,V);else if(Q.isFile())V.push(J)}catch{continue}}}catch{}return V}function JY(Y){return{json:Y.includes("--json"),requireTasks:Y.includes("--require-tasks"),includeTasks:Y.includes("--include-tasks"),pathsOnly:Y.includes("--paths-only"),skipFeatureCheck:Y.includes("--skip-feature-check"),skipPlanCheck:Y.includes("--skip-plan-check"),help:Y.includes("--help")||Y.includes("-h"),includeFileContents:Y.includes("--include-file-contents"),includeWorkflowMode:Y.includes("--include-workflow-mode"),validateCodeQuality:Y.includes("--validate-code-quality")}}function ZY(){console.log(`Usage: check-prerequisites.ts [OPTIONS]
+var __create = Object.create;
+var __getProtoOf = Object.getPrototypeOf;
+var __defProp = Object.defineProperty;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __toESM = (mod, isNodeMode, target) => {
+  target = mod != null ? __create(__getProtoOf(mod)) : {};
+  const to = isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target;
+  for (let key of __getOwnPropNames(mod))
+    if (!__hasOwnProp.call(to, key))
+      __defProp(to, key, {
+        get: () => mod[key],
+        enumerable: true
+      });
+  return to;
+};
+var __require = import.meta.require;
+
+// .speck/scripts/check-prerequisites.ts
+import { existsSync as existsSync2, readdirSync as readdirSync2, readFileSync, statSync } from "fs";
+import { join, basename, relative } from "path";
+
+// .speck/scripts/common/paths.ts
+import { existsSync } from "fs";
+import { readdirSync } from "fs";
+import fs from "fs/promises";
+import path from "path";
+var {$ } = globalThis.Bun;
+async function getRepoRoot() {
+  try {
+    const result = await $`git rev-parse --show-toplevel`.quiet();
+    return result.text().trim();
+  } catch {
+    return process.cwd();
+  }
+}
+var cachedConfig = null;
+async function detectSpeckRoot() {
+  if (cachedConfig) {
+    return cachedConfig;
+  }
+  const repoRoot = await getRepoRoot();
+  const symlinkPath = path.join(repoRoot, ".speck", "root");
+  try {
+    const stats = await fs.lstat(symlinkPath);
+    if (!stats.isSymbolicLink()) {
+      console.warn(`WARNING: .speck/root exists but is not a symlink
+` + `Expected: symlink to speck root directory
+` + `Found: regular file/directory
+` + `Falling back to single-repo mode.
+` + "To enable multi-repo: mv .speck/root .speck/root.backup && /speck.link <path>");
+      const config2 = {
+        mode: "single-repo",
+        speckRoot: repoRoot,
+        repoRoot,
+        specsDir: path.join(repoRoot, "specs")
+      };
+      cachedConfig = config2;
+      return config2;
+    }
+    const speckRoot = await fs.realpath(symlinkPath);
+    const dangerousPaths = ["/", "/etc", "/usr", "/bin", "/sbin", "/System", "/Library"];
+    const homeDir = process.env.HOME || process.env.USERPROFILE || "";
+    if (dangerousPaths.some((dangerous) => speckRoot === dangerous || speckRoot.startsWith(dangerous + "/"))) {
+      throw new Error(`Security: .speck/root symlink points to system directory: ${speckRoot}
+` + `Speck root must be a user-owned project directory.
+` + "Fix: rm .speck/root && /speck.link <safe-project-path>");
+    }
+    if (homeDir && speckRoot === path.dirname(homeDir)) {
+      throw new Error(`Security: .speck/root symlink points above home directory: ${speckRoot}
+` + "Fix: rm .speck/root && /speck.link <project-path-within-home>");
+    }
+    await fs.access(speckRoot);
+    const config = {
+      mode: "multi-repo",
+      speckRoot,
+      repoRoot,
+      specsDir: path.join(speckRoot, "specs")
+    };
+    cachedConfig = config;
+    return config;
+  } catch (error) {
+    const err = error;
+    if (err.code === "ENOENT") {
+      const childRepos = await findChildRepos(repoRoot);
+      if (childRepos.length > 0) {
+        const config2 = {
+          mode: "multi-repo",
+          speckRoot: repoRoot,
+          repoRoot,
+          specsDir: path.join(repoRoot, "specs")
+        };
+        cachedConfig = config2;
+        return config2;
+      }
+      const config = {
+        mode: "single-repo",
+        speckRoot: repoRoot,
+        repoRoot,
+        specsDir: path.join(repoRoot, "specs")
+      };
+      cachedConfig = config;
+      return config;
+    }
+    if (err.code === "ELOOP") {
+      throw new Error(`Multi-repo configuration broken: .speck/root contains circular reference
+` + "Fix: rm .speck/root && /speck.link <valid-path>");
+    }
+    const target = await fs.readlink(symlinkPath).catch(() => "unknown");
+    throw new Error(`Multi-repo configuration broken: .speck/root \u2192 ${target} (does not exist)
+` + `Fix:
+` + `  1. Remove broken symlink: rm .speck/root
+` + "  2. Link to correct location: /speck.link <path-to-speck-root>");
+  }
+}
+async function findChildRepos(speckRoot) {
+  const childRepos = [];
+  try {
+    const entries = await fs.readdir(speckRoot, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.isSymbolicLink() && entry.name.startsWith(".speck-link-")) {
+        const symlinkPath = path.join(speckRoot, entry.name);
+        try {
+          const targetPath = await fs.realpath(symlinkPath);
+          const dangerousPaths = ["/", "/etc", "/usr", "/bin", "/sbin", "/System", "/Library"];
+          if (dangerousPaths.some((dangerous) => targetPath === dangerous || targetPath.startsWith(dangerous + "/"))) {
+            console.warn(`Security: Skipping ${entry.name} - points to system directory: ${targetPath}`);
+            continue;
+          }
+          const gitDir = path.join(targetPath, ".git");
+          try {
+            await fs.access(gitDir);
+            childRepos.push(targetPath);
+          } catch {
+            console.warn(`Warning: ${entry.name} points to non-git directory: ${targetPath}`);
+          }
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          console.warn(`Warning: Broken symlink ${entry.name}: ${errorMessage}`);
+        }
+      }
+    }
+  } catch (error) {
+    const err = error;
+    if (err.code !== "ENOENT") {
+      throw error;
+    }
+  }
+  return childRepos;
+}
+async function getCurrentBranch(repoRoot) {
+  if (process.env.SPECIFY_FEATURE) {
+    return process.env.SPECIFY_FEATURE;
+  }
+  try {
+    const result = await $`git rev-parse --abbrev-ref HEAD`.quiet();
+    return result.text().trim();
+  } catch {
+    const specsDir = path.join(repoRoot, "specs");
+    if (existsSync(specsDir)) {
+      let latestFeature = "";
+      let highest = 0;
+      const dirs = readdirSync(specsDir, { withFileTypes: true });
+      for (const dir of dirs) {
+        if (dir.isDirectory()) {
+          const match = dir.name.match(/^(\d{3})-/);
+          if (match && match[1]) {
+            const number = parseInt(match[1], 10);
+            if (number > highest) {
+              highest = number;
+              latestFeature = dir.name;
+            }
+          }
+        }
+      }
+      if (latestFeature) {
+        return latestFeature;
+      }
+    }
+    return "main";
+  }
+}
+async function hasGit() {
+  try {
+    const cwd = process.cwd();
+    const gitDir = path.join(cwd, ".git");
+    if (existsSync(gitDir)) {
+      return true;
+    }
+    await $`git rev-parse --show-toplevel`.quiet();
+    return true;
+  } catch {
+    return false;
+  }
+}
+async function checkFeatureBranch(branch, hasGitRepo, repoRoot) {
+  if (!hasGitRepo) {
+    console.error("[specify] Warning: Git repository not detected; skipped branch validation");
+    return true;
+  }
+  const branchesFile = path.join(repoRoot, ".speck", "branches.json");
+  if (existsSync(branchesFile)) {
+    try {
+      const content = await fs.readFile(branchesFile, "utf-8");
+      const mapping = JSON.parse(content);
+      if (mapping.branches && Array.isArray(mapping.branches)) {
+        const branchExists = mapping.branches.some((b) => b.name === branch);
+        if (branchExists) {
+          return true;
+        }
+      }
+    } catch {}
+  }
+  if (!/^\d{3}-/.test(branch)) {
+    console.error(`ERROR: Not on a feature branch. Current branch: ${branch}`);
+    console.error("Feature branches should be named like: 001-feature-name");
+    return false;
+  }
+  return true;
+}
+async function findFeatureDirByPrefix(specsDir, branchName, repoRoot) {
+  const branchesFile = path.join(repoRoot, ".speck", "branches.json");
+  if (existsSync(branchesFile)) {
+    try {
+      const content = await fs.readFile(branchesFile, "utf-8");
+      const mapping = JSON.parse(content);
+      if (mapping.branches && Array.isArray(mapping.branches)) {
+        const branch = mapping.branches.find((b) => b.name === branchName);
+        if (branch && branch.specId) {
+          return path.join(specsDir, branch.specId);
+        }
+      }
+    } catch {}
+  }
+  const match = branchName.match(/^(\d{3})-/);
+  if (!match) {
+    return path.join(specsDir, branchName);
+  }
+  const prefix = match[1];
+  const matches = [];
+  if (existsSync(specsDir)) {
+    const dirs = readdirSync(specsDir, { withFileTypes: true });
+    for (const dir of dirs) {
+      if (dir.isDirectory() && dir.name.startsWith(`${prefix}-`)) {
+        matches.push(dir.name);
+      }
+    }
+  }
+  if (matches.length === 0) {
+    return path.join(specsDir, branchName);
+  } else if (matches.length === 1 && matches[0]) {
+    return path.join(specsDir, matches[0]);
+  } else {
+    console.error(`ERROR: Multiple spec directories found with prefix '${prefix}': ${matches.join(", ")}`);
+    console.error("Please ensure only one spec directory exists per numeric prefix.");
+    return path.join(specsDir, branchName);
+  }
+}
+async function getFeaturePaths() {
+  const config = await detectSpeckRoot();
+  const currentBranch = await getCurrentBranch(config.repoRoot);
+  const hasGitRepo = await hasGit();
+  const featureDir = await findFeatureDirByPrefix(config.specsDir, currentBranch, config.repoRoot);
+  const featureName = path.basename(featureDir);
+  const localSpecsDir = path.join(config.repoRoot, "specs", featureName);
+  return {
+    MODE: config.mode,
+    SPECK_ROOT: config.speckRoot,
+    SPECS_DIR: config.specsDir,
+    REPO_ROOT: config.repoRoot,
+    CURRENT_BRANCH: currentBranch,
+    HAS_GIT: hasGitRepo ? "true" : "false",
+    FEATURE_DIR: featureDir,
+    FEATURE_SPEC: path.join(featureDir, "spec.md"),
+    CHECKLISTS_DIR: path.join(featureDir, "checklists"),
+    LINKED_REPOS: path.join(featureDir, "linked-repos.md"),
+    IMPL_PLAN: path.join(localSpecsDir, "plan.md"),
+    TASKS: path.join(localSpecsDir, "tasks.md"),
+    RESEARCH: path.join(localSpecsDir, "research.md"),
+    DATA_MODEL: path.join(localSpecsDir, "data-model.md"),
+    QUICKSTART: path.join(localSpecsDir, "quickstart.md"),
+    CONTRACTS_DIR: path.join(localSpecsDir, "contracts")
+  };
+}
+
+// .speck/scripts/lib/output-formatter.ts
+function detectInputMode(options) {
+  return options.hook ? "hook" : "default";
+}
+function detectOutputMode(options) {
+  if (options.hook) {
+    return "hook";
+  }
+  if (options.json) {
+    return "json";
+  }
+  return "human";
+}
+async function readHookInput(stdinContent) {
+  try {
+    let content = stdinContent;
+    if (content === undefined) {
+      const stdin = Bun.stdin.stream();
+      const reader = stdin.getReader();
+      const readPromise = reader.read();
+      const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve({ done: true, value: undefined }), 100));
+      const result = await Promise.race([readPromise, timeoutPromise]);
+      reader.releaseLock();
+      if (result.done || !result.value) {
+        return;
+      }
+      content = new TextDecoder().decode(result.value);
+    }
+    if (!content || content.trim() === "") {
+      return;
+    }
+    const parsed = JSON.parse(content);
+    return parsed;
+  } catch {
+    return;
+  }
+}
+function formatJsonOutput(input) {
+  const now = Date.now();
+  const duration = input.startTime ? now - input.startTime : 0;
+  const output = {
+    ok: input.success,
+    meta: {
+      command: input.command,
+      timestamp: new Date(now).toISOString(),
+      duration_ms: duration
+    }
+  };
+  if (input.success && input.data !== undefined) {
+    output.result = input.data;
+  }
+  if (!input.success && input.error) {
+    output.error = {
+      code: input.error.code,
+      message: input.error.message
+    };
+    if (input.error.recovery) {
+      output.error.recovery = input.error.recovery;
+    }
+  }
+  return output;
+}
+function formatHookOutput(input) {
+  if (input.passthrough) {
+    return {};
+  }
+  const output = {};
+  if (input.hookType === "UserPromptSubmit" && input.context) {
+    output.context = input.context;
+  }
+  if (input.hookType === "SessionStart" && input.additionalContext) {
+    output.hookSpecificOutput = {
+      additionalContext: input.additionalContext
+    };
+  }
+  if (input.hookType === "PreToolUse") {
+    if (input.allow !== undefined) {
+      output.allow = input.allow;
+    }
+    if (input.message) {
+      output.message = input.message;
+    }
+  }
+  if (input.message && !output.message) {
+    output.message = input.message;
+  }
+  return output;
+}
+
+// .speck/scripts/check-prerequisites.ts
+function collectAllFiles(dirPath, fileList = []) {
+  if (!existsSync2(dirPath)) {
+    return fileList;
+  }
+  try {
+    const entries = readdirSync2(dirPath);
+    for (const entry of entries) {
+      const fullPath = join(dirPath, entry);
+      try {
+        const stat = statSync(fullPath);
+        if (stat.isDirectory()) {
+          collectAllFiles(fullPath, fileList);
+        } else if (stat.isFile()) {
+          fileList.push(fullPath);
+        }
+      } catch {
+        continue;
+      }
+    }
+  } catch {}
+  return fileList;
+}
+function parseArgs(args) {
+  return {
+    json: args.includes("--json"),
+    hook: args.includes("--hook"),
+    requireTasks: args.includes("--require-tasks"),
+    includeTasks: args.includes("--include-tasks"),
+    pathsOnly: args.includes("--paths-only"),
+    skipFeatureCheck: args.includes("--skip-feature-check"),
+    skipPlanCheck: args.includes("--skip-plan-check"),
+    help: args.includes("--help") || args.includes("-h"),
+    includeFileContents: args.includes("--include-file-contents"),
+    includeWorkflowMode: args.includes("--include-workflow-mode"),
+    validateCodeQuality: args.includes("--validate-code-quality")
+  };
+}
+function showHelp() {
+  console.log(`Usage: check-prerequisites.ts [OPTIONS]
 
 Consolidated prerequisite checking for Spec-Driven Development workflow.
 
 OPTIONS:
-  --json                   Output in JSON format
+  --json                   Output in JSON format (structured JSON envelope)
+  --hook                   Output hook-formatted response for Claude Code hooks
   --require-tasks          Require tasks.md to exist (for implementation phase)
   --include-tasks          Include tasks.md in AVAILABLE_DOCS list
   --paths-only             Only output path variables (no prerequisite validation)
@@ -27,6 +430,11 @@ OPTIONS:
   --include-workflow-mode  Include workflow mode in JSON output
   --help, -h               Show this help message
 
+OUTPUT MODES:
+  Default (human): Human-readable text output
+  --json: Structured JSON with { ok, result, error, meta } envelope
+  --hook: Hook output for Claude Code integration (context injection)
+
 EXAMPLES:
   # Check task prerequisites (plan.md required)
   bun .speck/scripts/check-prerequisites.ts --json
@@ -34,28 +442,566 @@ EXAMPLES:
   # Check implementation prerequisites (plan.md + tasks.md required)
   bun .speck/scripts/check-prerequisites.ts --json --require-tasks --include-tasks
 
+  # For Claude Code hook integration
+  bun .speck/scripts/check-prerequisites.ts --hook --include-workflow-mode
+
   # Validate code quality before feature completion
   bun .speck/scripts/check-prerequisites.ts --validate-code-quality
 
   # Get feature paths only (no validation)
   bun .speck/scripts/check-prerequisites.ts --paths-only
-`)}function UY(Y,V){if(V){let H={MODE:Y.MODE,REPO_ROOT:Y.REPO_ROOT,BRANCH:Y.CURRENT_BRANCH,FEATURE_DIR:Y.FEATURE_DIR,FEATURE_SPEC:Y.FEATURE_SPEC,IMPL_PLAN:Y.IMPL_PLAN,TASKS:Y.TASKS};console.log(JSON.stringify(H))}else console.log(`MODE: ${Y.MODE}`),console.log(`REPO_ROOT: ${Y.REPO_ROOT}`),console.log(`BRANCH: ${Y.CURRENT_BRANCH}`),console.log(`FEATURE_DIR: ${Y.FEATURE_DIR}`),console.log(`FEATURE_SPEC: ${Y.FEATURE_SPEC}`),console.log(`IMPL_PLAN: ${Y.IMPL_PLAN}`),console.log(`TASKS: ${Y.TASKS}`)}function KY(Y){let V=["--json","--require-tasks","--include-tasks","--paths-only","--skip-feature-check","--skip-plan-check","--help","-h","--include-file-contents","--include-workflow-mode","--validate-code-quality"];for(let H of Y)if(H.startsWith("--")||H.startsWith("-")){if(!V.includes(H))console.error(`ERROR: Unknown option '${H}'. Use --help for usage information.`),process.exit(1)}}var C={maxSingleFile:24576,maxTotalFiles:102400};function j(Y,V){if(!$(Y))return"NOT_FOUND";try{let X=Bun.file(Y).size;if(X>C.maxSingleFile)return"TOO_LARGE";if(V.value+X>C.maxTotalFiles)return"TOO_LARGE";let J=E(Y,"utf-8");return V.value+=X,J}catch(H){return"NOT_FOUND"}}async function WY(Y){let{$:V}=awaitPromise.resolve(globalThis.Bun),H=await V`bun run typecheck`.cwd(Y).nothrow().quiet();if(H.exitCode!==0)return{passed:!1,message:`\u274C TypeScript validation failed (exit code ${H.exitCode})
-${H.stderr.toString()}`};let X=await V`bun run lint`.cwd(Y).nothrow().quiet();if(X.exitCode!==0){let J=X.stdout.toString();return{passed:!1,message:`\u274C ESLint validation failed (exit code ${X.exitCode})
-${J}`}}return{passed:!0,message:"\u2705 Code quality validation passed (0 typecheck errors, 0 lint errors/warnings)"}}function GY(Y,V){let H=A(Y,"plan.md");if($(H))try{let Q=E(H,"utf-8").match(/\*\*Workflow Mode\*\*:\s*(stacked-pr|single-branch)/);if(Q&&Q[1])return Q[1]}catch{}let X=A(V,".speck","memory","constitution.md");if($(X))try{let Q=E(X,"utf-8").match(/\*\*Default Workflow Mode\*\*:\s*(stacked-pr|single-branch)/);if(Q&&Q[1])return Q[1]}catch{}return"single-branch"}async function R(Y){if(!Y.includes("--json")&&process.stdout.isTTY)console.warn(`\x1B[33m\u26A0\uFE0F  DEPRECATION WARNING: Direct invocation deprecated. Prerequisites are now auto-checked via PrePromptSubmit hook.\x1B[0m
-`);KY(Y);let V=JY(Y);if(V.help)return ZY(),0;let H=await k(),X=H.HAS_GIT==="true";if(!V.skipFeatureCheck){if(!await S(H.CURRENT_BRANCH,X,H.REPO_ROOT))return 1}if(V.pathsOnly||V.skipFeatureCheck)return UY(H,V.json),0;if(!$(H.FEATURE_DIR))return console.error(`ERROR: Feature directory not found: ${H.FEATURE_DIR}`),console.error("Run /speck.specify first to create the feature structure."),1;if(!V.skipPlanCheck&&!$(H.IMPL_PLAN))return console.error(`ERROR: plan.md not found in ${H.FEATURE_DIR}`),console.error("Run /speck.plan first to create the implementation plan."),1;if(V.requireTasks&&!$(H.TASKS))return console.error(`ERROR: tasks.md not found in ${H.FEATURE_DIR}`),console.error("Run /speck.tasks first to create the task list."),1;let J=[],Q=F(H.FEATURE_DIR);J.push(...Q);let Z=A(H.SPECK_ROOT,".speck","linked-repos.md");if($(Z))J.push(Z);let U=A(H.SPECK_ROOT,".speck","memory","constitution.md");if($(U))J.push(U);let W=A(H.REPO_ROOT,".speck","memory","constitution.md");if(W!==U&&$(W))J.push(W);let T=VY(H.FEATURE_DIR),w=A(H.REPO_ROOT,"specs",T);if(w!==H.FEATURE_DIR){let G=F(w);J.push(...G)}let x=J.map((G)=>{return XY(H.REPO_ROOT,G)}),b=V.includeTasks?x:x.filter((G)=>!G.endsWith("tasks.md")),v;if(V.includeFileContents){v={};let G={value:0};v["tasks.md"]=j(H.TASKS,G),v["plan.md"]=j(H.IMPL_PLAN,G),v["spec.md"]=j(H.FEATURE_SPEC,G);let u=A(H.REPO_ROOT,".speck","memory","constitution.md");if(v["constitution.md"]=j(u,G),v["data-model.md"]=j(H.DATA_MODEL,G),v["research.md"]=j(H.RESEARCH,G),$(H.CHECKLISTS_DIR))try{let h=P(H.CHECKLISTS_DIR).filter((L)=>L.endsWith(".md"));for(let L of h){let l=A(H.CHECKLISTS_DIR,L);v[`checklists/${L}`]=j(l,G)}}catch{}}let N;if(V.includeWorkflowMode)N=GY(H.FEATURE_DIR,H.REPO_ROOT);if(V.validateCodeQuality){let G=await WY(H.REPO_ROOT);if(!G.passed)return console.error(`
-`+G.message),console.error(`
-Constitution Principle IX requires zero typecheck errors and zero lint errors/warnings.`),console.error(`Fix all issues before marking the feature complete.
-`),1;if(!V.json)console.log(`
-`+G.message+`
-`)}if(V.json){let G={MODE:H.MODE,FEATURE_DIR:H.FEATURE_DIR,AVAILABLE_DOCS:b,...v&&{FILE_CONTENTS:v},...N&&{WORKFLOW_MODE:N},IMPL_PLAN:H.IMPL_PLAN,TASKS:H.TASKS,REPO_ROOT:H.REPO_ROOT};console.log(JSON.stringify(G))}else{console.log(`FEATURE_DIR:${H.FEATURE_DIR}`),console.log("AVAILABLE_DOCS:");for(let G of b)console.log(`  \u2713 ${G}`)}return 0}var O=null;function m(){if(!O)return null;if(Date.now()-O.timestamp>5000)return O=null,null;return O}function I(Y){O=Y}async function $Y(Y){let{log:V,error:H}=console,X="",J="";console.log=(...Q)=>{X+=Q.join(" ")+`
-`},console.error=(...Q)=>{J+=Q.join(" ")+`
-`};try{return{exitCode:await Y(),stdout:X.trim(),stderr:J.trim()}}catch(Q){let Z=Q instanceof Error?Q:Error(String(Q));return J+=`Error: ${Z.message}
-`,{exitCode:2,stdout:X.trim(),stderr:J.trim()}}finally{console.log=V,console.error=H}}async function f(Y={},V=!0){if(V){let H=m();if(H)return{success:H.success,output:H.output,error:H.error,cached:!0}}try{let H=["--json"];if(Y.requireTasks)H.push("--require-tasks");if(Y.includeTasks)H.push("--include-tasks");if(Y.skipFeatureCheck)H.push("--skip-feature-check");if(Y.skipPlanCheck)H.push("--skip-plan-check");if(Y.includeFileContents)H.push("--include-file-contents");if(Y.includeWorkflowMode)H.push("--include-workflow-mode");let{exitCode:X,stdout:J,stderr:Q}=await $Y(()=>R(H));if(X===0)try{let Z=JSON.parse(J),U={success:!0,output:Z,error:null,cached:!1};return I({success:!0,output:Z,error:null,timestamp:Date.now()}),U}catch(Z){let W=`Failed to parse check-prerequisites output: ${(Z instanceof Error?Z:Error(String(Z))).message}`,T={success:!1,output:null,error:W,cached:!1};return I({success:!1,output:null,error:W,timestamp:Date.now()}),T}else{let Z=Q||`check-prerequisites exited with code ${X}`,U={success:!1,output:null,error:Z,cached:!1};return I({success:!1,output:null,error:Z,timestamp:Date.now()}),U}}catch(H){let J=`Failed to run check-prerequisites: ${(H instanceof Error?H:Error(String(H))).message}`,Q={success:!1,output:null,error:J,cached:!1};return I({success:!1,output:null,error:J,timestamp:Date.now()}),Q}}function d(Y){if(!Y.success||!Y.output)return"";let{FEATURE_DIR:V,AVAILABLE_DOCS:H,MODE:X,WORKFLOW_MODE:J,IMPL_PLAN:Q,TASKS:Z,REPO_ROOT:U}=Y.output,W={MODE:X,FEATURE_DIR:V,AVAILABLE_DOCS:H};if(J)W.WORKFLOW_MODE=J;if(Q)W.IMPL_PLAN=Q;if(Z)W.TASKS=Z;if(U)W.REPO_ROOT=U;return`<!-- SPECK_PREREQ_CONTEXT
-${JSON.stringify(W)}
--->`}function g(Y){return`\u26A0\uFE0F **Prerequisite Check Failed**
+`);
+}
+function outputPathsOnly(paths, jsonMode) {
+  if (jsonMode) {
+    const output = {
+      MODE: paths.MODE,
+      REPO_ROOT: paths.REPO_ROOT,
+      BRANCH: paths.CURRENT_BRANCH,
+      FEATURE_DIR: paths.FEATURE_DIR,
+      FEATURE_SPEC: paths.FEATURE_SPEC,
+      IMPL_PLAN: paths.IMPL_PLAN,
+      TASKS: paths.TASKS
+    };
+    console.log(JSON.stringify(output));
+  } else {
+    console.log(`MODE: ${paths.MODE}`);
+    console.log(`REPO_ROOT: ${paths.REPO_ROOT}`);
+    console.log(`BRANCH: ${paths.CURRENT_BRANCH}`);
+    console.log(`FEATURE_DIR: ${paths.FEATURE_DIR}`);
+    console.log(`FEATURE_SPEC: ${paths.FEATURE_SPEC}`);
+    console.log(`IMPL_PLAN: ${paths.IMPL_PLAN}`);
+    console.log(`TASKS: ${paths.TASKS}`);
+  }
+}
+function checkForUnknownOptions(args, _outputMode) {
+  const validOptions = [
+    "--json",
+    "--hook",
+    "--require-tasks",
+    "--include-tasks",
+    "--paths-only",
+    "--skip-feature-check",
+    "--skip-plan-check",
+    "--help",
+    "-h",
+    "--include-file-contents",
+    "--include-workflow-mode",
+    "--validate-code-quality"
+  ];
+  for (const arg of args) {
+    if (arg.startsWith("--") || arg.startsWith("-")) {
+      if (!validOptions.includes(arg)) {
+        return `Unknown option '${arg}'. Use --help for usage information.`;
+      }
+    }
+  }
+  return null;
+}
+var FILE_SIZE_LIMITS = {
+  maxSingleFile: 24 * 1024,
+  maxTotalFiles: 100 * 1024
+};
+function loadFileContent(filePath, totalSize) {
+  if (!existsSync2(filePath)) {
+    return "NOT_FOUND";
+  }
+  try {
+    const stats = Bun.file(filePath);
+    const fileSize = stats.size;
+    if (fileSize > FILE_SIZE_LIMITS.maxSingleFile) {
+      return "TOO_LARGE";
+    }
+    if (totalSize.value + fileSize > FILE_SIZE_LIMITS.maxTotalFiles) {
+      return "TOO_LARGE";
+    }
+    const content = readFileSync(filePath, "utf-8");
+    totalSize.value += fileSize;
+    return content;
+  } catch (error) {
+    return "NOT_FOUND";
+  }
+}
+async function validateCodeQuality(repoRoot) {
+  const { $: $2 } = await Promise.resolve(globalThis.Bun);
+  const typecheckResult = await $2`bun run typecheck`.cwd(repoRoot).nothrow().quiet();
+  if (typecheckResult.exitCode !== 0) {
+    return {
+      passed: false,
+      message: `\u274C TypeScript validation failed (exit code ${typecheckResult.exitCode})
+${typecheckResult.stderr.toString()}`
+    };
+  }
+  const lintResult = await $2`bun run lint`.cwd(repoRoot).nothrow().quiet();
+  if (lintResult.exitCode !== 0) {
+    const output = lintResult.stdout.toString();
+    return {
+      passed: false,
+      message: `\u274C ESLint validation failed (exit code ${lintResult.exitCode})
+${output}`
+    };
+  }
+  return {
+    passed: true,
+    message: "\u2705 Code quality validation passed (0 typecheck errors, 0 lint errors/warnings)"
+  };
+}
+function determineWorkflowMode(featureDir, repoRoot) {
+  const planPath = join(featureDir, "plan.md");
+  if (existsSync2(planPath)) {
+    try {
+      const planContent = readFileSync(planPath, "utf-8");
+      const workflowMatch = planContent.match(/\*\*Workflow Mode\*\*:\s*(stacked-pr|single-branch)/);
+      if (workflowMatch && workflowMatch[1]) {
+        return workflowMatch[1];
+      }
+    } catch {}
+  }
+  const constitutionPath = join(repoRoot, ".speck", "memory", "constitution.md");
+  if (existsSync2(constitutionPath)) {
+    try {
+      const constitutionContent = readFileSync(constitutionPath, "utf-8");
+      const workflowMatch = constitutionContent.match(/\*\*Default Workflow Mode\*\*:\s*(stacked-pr|single-branch)/);
+      if (workflowMatch && workflowMatch[1]) {
+        return workflowMatch[1];
+      }
+    } catch {}
+  }
+  return "single-branch";
+}
+function outputError(code, message, recovery, outputMode, startTime) {
+  if (outputMode === "json") {
+    const output = formatJsonOutput({
+      success: false,
+      error: { code, message, recovery },
+      command: "check-prerequisites",
+      startTime
+    });
+    console.log(JSON.stringify(output));
+  } else if (outputMode === "hook") {
+    console.error(`ERROR: ${message}`);
+    recovery.forEach((r) => console.error(r));
+  } else {
+    console.error(`ERROR: ${message}`);
+    recovery.forEach((r) => console.error(r));
+  }
+}
+async function main(args) {
+  const startTime = Date.now();
+  const options = parseArgs(args);
+  const outputMode = detectOutputMode(options);
+  if (outputMode === "human" && process.stdout.isTTY) {
+    console.warn(`\x1B[33m\u26A0\uFE0F  DEPRECATION WARNING: Direct invocation deprecated. Prerequisites are now auto-checked via PrePromptSubmit hook.\x1B[0m
+`);
+  }
+  const unknownOptionError = checkForUnknownOptions(args, outputMode);
+  if (unknownOptionError) {
+    outputError("INVALID_ARGS", unknownOptionError, [], outputMode, startTime);
+    return 1 /* USER_ERROR */;
+  }
+  if (options.help) {
+    showHelp();
+    return 0 /* SUCCESS */;
+  }
+  if (detectInputMode(options) === "hook") {
+    await readHookInput();
+  }
+  const paths = await getFeaturePaths();
+  const hasGitRepo = paths.HAS_GIT === "true";
+  if (!options.skipFeatureCheck) {
+    if (!await checkFeatureBranch(paths.CURRENT_BRANCH, hasGitRepo, paths.REPO_ROOT)) {
+      outputError("NOT_ON_FEATURE_BRANCH", `Not on a feature branch: ${paths.CURRENT_BRANCH}`, ["Switch to a feature branch (e.g., git checkout 001-feature-name)"], outputMode, startTime);
+      return 1 /* USER_ERROR */;
+    }
+  }
+  if (options.pathsOnly || options.skipFeatureCheck) {
+    outputPathsOnly(paths, options.json);
+    return 0 /* SUCCESS */;
+  }
+  if (!existsSync2(paths.FEATURE_DIR)) {
+    outputError("FEATURE_DIR_NOT_FOUND", `Feature directory not found: ${paths.FEATURE_DIR}`, ["Run /speck.specify first to create the feature structure."], outputMode, startTime);
+    return 1 /* USER_ERROR */;
+  }
+  if (!options.skipPlanCheck && !existsSync2(paths.IMPL_PLAN)) {
+    outputError("PLAN_NOT_FOUND", `plan.md not found in ${paths.FEATURE_DIR}`, ["Run /speck.plan first to create the implementation plan."], outputMode, startTime);
+    return 1 /* USER_ERROR */;
+  }
+  if (options.requireTasks && !existsSync2(paths.TASKS)) {
+    outputError("TASKS_NOT_FOUND", `tasks.md not found in ${paths.FEATURE_DIR}`, ["Run /speck.tasks first to create the task list."], outputMode, startTime);
+    return 1 /* USER_ERROR */;
+  }
+  const absoluteDocs = [];
+  const rootFeatureFiles = collectAllFiles(paths.FEATURE_DIR);
+  absoluteDocs.push(...rootFeatureFiles);
+  const linkedReposPath = join(paths.SPECK_ROOT, ".speck", "linked-repos.md");
+  if (existsSync2(linkedReposPath)) {
+    absoluteDocs.push(linkedReposPath);
+  }
+  const rootConstitutionPath = join(paths.SPECK_ROOT, ".speck", "memory", "constitution.md");
+  if (existsSync2(rootConstitutionPath)) {
+    absoluteDocs.push(rootConstitutionPath);
+  }
+  const childConstitutionPath = join(paths.REPO_ROOT, ".speck", "memory", "constitution.md");
+  if (childConstitutionPath !== rootConstitutionPath && existsSync2(childConstitutionPath)) {
+    absoluteDocs.push(childConstitutionPath);
+  }
+  const featureName = basename(paths.FEATURE_DIR);
+  const localFeatureDir = join(paths.REPO_ROOT, "specs", featureName);
+  if (localFeatureDir !== paths.FEATURE_DIR) {
+    const localFeatureFiles = collectAllFiles(localFeatureDir);
+    absoluteDocs.push(...localFeatureFiles);
+  }
+  const relativeDocs = absoluteDocs.map((absolutePath) => {
+    return relative(paths.REPO_ROOT, absolutePath);
+  });
+  const filteredDocs = options.includeTasks ? relativeDocs : relativeDocs.filter((filePath) => !filePath.endsWith("tasks.md"));
+  let fileContents;
+  if (options.includeFileContents) {
+    fileContents = {};
+    const totalSize = { value: 0 };
+    fileContents["tasks.md"] = loadFileContent(paths.TASKS, totalSize);
+    fileContents["plan.md"] = loadFileContent(paths.IMPL_PLAN, totalSize);
+    fileContents["spec.md"] = loadFileContent(paths.FEATURE_SPEC, totalSize);
+    const constitutionPath = join(paths.REPO_ROOT, ".speck", "memory", "constitution.md");
+    fileContents["constitution.md"] = loadFileContent(constitutionPath, totalSize);
+    fileContents["data-model.md"] = loadFileContent(paths.DATA_MODEL, totalSize);
+    fileContents["research.md"] = loadFileContent(paths.RESEARCH, totalSize);
+    if (existsSync2(paths.CHECKLISTS_DIR)) {
+      try {
+        const checklistFiles = readdirSync2(paths.CHECKLISTS_DIR).filter((f) => f.endsWith(".md"));
+        for (const file of checklistFiles) {
+          const checklistPath = join(paths.CHECKLISTS_DIR, file);
+          fileContents[`checklists/${file}`] = loadFileContent(checklistPath, totalSize);
+        }
+      } catch {}
+    }
+  }
+  let workflowMode;
+  if (options.includeWorkflowMode || outputMode === "hook") {
+    workflowMode = determineWorkflowMode(paths.FEATURE_DIR, paths.REPO_ROOT);
+  }
+  if (options.validateCodeQuality) {
+    const qualityResult = await validateCodeQuality(paths.REPO_ROOT);
+    if (!qualityResult.passed) {
+      outputError("CODE_QUALITY_FAILED", qualityResult.message, ["Constitution Principle IX requires zero typecheck errors and zero lint errors/warnings.", "Fix all issues before marking the feature complete."], outputMode, startTime);
+      return 1 /* USER_ERROR */;
+    }
+    if (outputMode === "human") {
+      console.log(`
+` + qualityResult.message + `
+`);
+    }
+  }
+  const validationData = {
+    MODE: paths.MODE,
+    FEATURE_DIR: paths.FEATURE_DIR,
+    AVAILABLE_DOCS: filteredDocs,
+    ...fileContents && { FILE_CONTENTS: fileContents },
+    ...workflowMode && { WORKFLOW_MODE: workflowMode },
+    IMPL_PLAN: paths.IMPL_PLAN,
+    TASKS: paths.TASKS,
+    REPO_ROOT: paths.REPO_ROOT
+  };
+  if (outputMode === "json") {
+    const output = formatJsonOutput({
+      success: true,
+      data: validationData,
+      command: "check-prerequisites",
+      startTime
+    });
+    console.log(JSON.stringify(output));
+  } else if (outputMode === "hook") {
+    const hookContext = buildHookContext(validationData);
+    const hookOutput = formatHookOutput({
+      hookType: "UserPromptSubmit",
+      context: hookContext
+    });
+    console.log(JSON.stringify(hookOutput));
+  } else {
+    console.log(`FEATURE_DIR:${paths.FEATURE_DIR}`);
+    console.log("AVAILABLE_DOCS:");
+    for (const filePath of filteredDocs) {
+      console.log(`  \u2713 ${filePath}`);
+    }
+  }
+  return 0 /* SUCCESS */;
+}
+function buildHookContext(data) {
+  const lines = [
+    "<!-- SPECK_PREREQ_CONTEXT",
+    JSON.stringify({
+      MODE: data.MODE,
+      FEATURE_DIR: data.FEATURE_DIR,
+      AVAILABLE_DOCS: data.AVAILABLE_DOCS,
+      WORKFLOW_MODE: data.WORKFLOW_MODE,
+      IMPL_PLAN: data.IMPL_PLAN,
+      TASKS: data.TASKS,
+      REPO_ROOT: data.REPO_ROOT
+    }),
+    "-->"
+  ];
+  return lines.join(`
+`);
+}
+if (false) {}
 
-${Y}
+// .speck/scripts/lib/prereq-cache.ts
+var CACHE_TTL_MS = 5000;
+var cachedResult = null;
+function getCachedResult() {
+  if (!cachedResult) {
+    return null;
+  }
+  const now = Date.now();
+  const age = now - cachedResult.timestamp;
+  if (age > CACHE_TTL_MS) {
+    cachedResult = null;
+    return null;
+  }
+  return cachedResult;
+}
+function cacheResult(result) {
+  cachedResult = result;
+}
+
+// .speck/scripts/lib/prereq-runner.ts
+async function captureOutput(fn) {
+  const originalLog = console.log;
+  const originalError = console.error;
+  let stdout = "";
+  let stderr = "";
+  console.log = (...args) => {
+    stdout += args.join(" ") + `
+`;
+  };
+  console.error = (...args) => {
+    stderr += args.join(" ") + `
+`;
+  };
+  try {
+    const exitCode = await fn();
+    return { exitCode, stdout: stdout.trim(), stderr: stderr.trim() };
+  } catch (error) {
+    const err = error instanceof Error ? error : new Error(String(error));
+    stderr += `Error: ${err.message}
+`;
+    return { exitCode: 2, stdout: stdout.trim(), stderr: stderr.trim() };
+  } finally {
+    console.log = originalLog;
+    console.error = originalError;
+  }
+}
+async function runPrerequisiteCheck(options = {}, useCache = true) {
+  if (useCache) {
+    const cached = getCachedResult();
+    if (cached) {
+      return {
+        success: cached.success,
+        output: cached.output,
+        error: cached.error,
+        cached: true
+      };
+    }
+  }
+  try {
+    const args = ["--json"];
+    if (options.requireTasks)
+      args.push("--require-tasks");
+    if (options.includeTasks)
+      args.push("--include-tasks");
+    if (options.skipFeatureCheck)
+      args.push("--skip-feature-check");
+    if (options.skipPlanCheck)
+      args.push("--skip-plan-check");
+    if (options.includeFileContents)
+      args.push("--include-file-contents");
+    if (options.includeWorkflowMode)
+      args.push("--include-workflow-mode");
+    const { exitCode, stdout, stderr } = await captureOutput(() => main(args));
+    if (exitCode === 0) {
+      try {
+        const output = JSON.parse(stdout);
+        const result = {
+          success: true,
+          output,
+          error: null,
+          cached: false
+        };
+        cacheResult({
+          success: true,
+          output,
+          error: null,
+          timestamp: Date.now()
+        });
+        return result;
+      } catch (parseError) {
+        const err = parseError instanceof Error ? parseError : new Error(String(parseError));
+        const error = `Failed to parse check-prerequisites output: ${err.message}`;
+        const result = {
+          success: false,
+          output: null,
+          error,
+          cached: false
+        };
+        cacheResult({
+          success: false,
+          output: null,
+          error,
+          timestamp: Date.now()
+        });
+        return result;
+      }
+    } else {
+      const error = stderr || `check-prerequisites exited with code ${exitCode}`;
+      const result = {
+        success: false,
+        output: null,
+        error,
+        cached: false
+      };
+      cacheResult({
+        success: false,
+        output: null,
+        error,
+        timestamp: Date.now()
+      });
+      return result;
+    }
+  } catch (error) {
+    const err = error instanceof Error ? error : new Error(String(error));
+    const errorMsg = `Failed to run check-prerequisites: ${err.message}`;
+    const result = {
+      success: false,
+      output: null,
+      error: errorMsg,
+      cached: false
+    };
+    cacheResult({
+      success: false,
+      output: null,
+      error: errorMsg,
+      timestamp: Date.now()
+    });
+    return result;
+  }
+}
+function formatPrereqContext(result) {
+  if (!result.success || !result.output) {
+    return "";
+  }
+  const { FEATURE_DIR, AVAILABLE_DOCS, MODE, WORKFLOW_MODE, IMPL_PLAN, TASKS, REPO_ROOT } = result.output;
+  const contextData = {
+    MODE,
+    FEATURE_DIR,
+    AVAILABLE_DOCS
+  };
+  if (WORKFLOW_MODE) {
+    contextData.WORKFLOW_MODE = WORKFLOW_MODE;
+  }
+  if (IMPL_PLAN) {
+    contextData.IMPL_PLAN = IMPL_PLAN;
+  }
+  if (TASKS) {
+    contextData.TASKS = TASKS;
+  }
+  if (REPO_ROOT) {
+    contextData.REPO_ROOT = REPO_ROOT;
+  }
+  return `<!-- SPECK_PREREQ_CONTEXT
+${JSON.stringify(contextData)}
+-->`;
+}
+function formatPrereqError(error) {
+  return `\u26A0\uFE0F **Prerequisite Check Failed**
+
+${error}
 
 Please ensure you're on a valid feature branch and have run the necessary Speck commands.
-`.trim()}import{appendFile as BY}from"fs/promises";var vY="/private/tmp/.claude-hook-test/speck-hook-log.txt",B=async(Y)=>{await BY(vY,`[${new Date().toISOString()}] [PrePromptSubmit] ${Y}
-`)};function qY(Y){return/^\/speck[.:]/.test(Y.trim())}function AY(Y){let H=Y.match(/^\/speck[.:](\w+)/)?.[1]??"",X=["implement"],J=["implement","analyze"],Q=["specify","constitution","env","link"],Z=["plan","clarify","constitution","env","link"],U=["implement","analyze","plan","tasks","checklist","clarify"],W=["implement"];return{requireTasks:X.includes(H),includeTasks:J.includes(H),skipFeatureCheck:Q.includes(H),skipPlanCheck:Z.includes(H),includeFileContents:U.includes(H),includeWorkflowMode:W.includes(H)}}async function TY(){try{let Y=await Bun.stdin.text();await B(`Received hook input (length: ${Y.length})`);let V=JSON.parse(Y),{prompt:H}=V;if(await B(`Parsed prompt: ${H.substring(0,100)}${H.length>100?"...":""}`),!qY(H)){await B("Not a /speck.* command, passing through"),console.log(JSON.stringify({}));return}let X=H.match(/^\/speck[.:]\w+/);await B(`Detected /speck.* command: ${X?.[0]??"unknown"}`);let J=AY(H);await B(`Check options: ${JSON.stringify(J)}`);let Q=await f(J,!0);if(await B(`Prerequisite check result: success=${Q.success}`),Q.success&&Q.output){let Z=d(Q);await B(`Formatted context (length: ${Z.length})`),await B(`Context preview: ${Z.substring(0,200)}`);let U={hookSpecificOutput:{hookEventName:"UserPromptSubmit",additionalContext:Z}};await B("Returning success with additionalContext"),console.log(JSON.stringify(U))}else{let Z=g(Q.error||"Unknown error");await B(`Blocking with error: ${Q.error}`),console.log(JSON.stringify({decision:"block",reason:Z,hookSpecificOutput:{hookEventName:"UserPromptSubmit"}}))}}catch(Y){let V=Y instanceof Error?Y.message:String(Y);await B(`Hook error: ${V}`),console.error(`PrePromptSubmit hook error: ${V}`),console.log(JSON.stringify({}))}}TY();
+`.trim();
+}
+
+// .speck/scripts/hooks/pre-prompt-submit.ts
+import { appendFile } from "fs/promises";
+var LOG_FILE = "/private/tmp/.claude-hook-test/speck-hook-log.txt";
+var log = async (msg) => {
+  await appendFile(LOG_FILE, `[${new Date().toISOString()}] [PrePromptSubmit] ${msg}
+`);
+};
+function isSpeckSlashCommand(prompt) {
+  return /^\/speck[.:]/.test(prompt.trim());
+}
+function getCheckOptions(prompt) {
+  const match = prompt.match(/^\/speck[.:](\w+)/);
+  const command = match?.[1] ?? "";
+  const requireTasksCommands = ["implement"];
+  const includeTasksCommands = ["implement", "analyze"];
+  const skipFeatureCheckCommands = ["specify", "constitution", "env", "link", "init"];
+  const skipPlanCheckCommands = ["plan", "clarify", "constitution", "env", "link", "init"];
+  const includeFileContentsCommands = [
+    "implement",
+    "analyze",
+    "plan",
+    "tasks",
+    "checklist",
+    "clarify"
+  ];
+  const includeWorkflowModeCommands = ["implement"];
+  return {
+    requireTasks: requireTasksCommands.includes(command),
+    includeTasks: includeTasksCommands.includes(command),
+    skipFeatureCheck: skipFeatureCheckCommands.includes(command),
+    skipPlanCheck: skipPlanCheckCommands.includes(command),
+    includeFileContents: includeFileContentsCommands.includes(command),
+    includeWorkflowMode: includeWorkflowModeCommands.includes(command)
+  };
+}
+async function main2() {
+  try {
+    const input = await Bun.stdin.text();
+    await log(`Received hook input (length: ${input.length})`);
+    const hookInput = JSON.parse(input);
+    const { prompt } = hookInput;
+    await log(`Parsed prompt: ${prompt.substring(0, 100)}${prompt.length > 100 ? "..." : ""}`);
+    if (!isSpeckSlashCommand(prompt)) {
+      await log(`Not a /speck.* command, passing through`);
+      console.log(JSON.stringify({}));
+      return;
+    }
+    const commandMatch = prompt.match(/^\/speck[.:]\w+/);
+    await log(`Detected /speck.* command: ${commandMatch?.[0] ?? "unknown"}`);
+    const options = getCheckOptions(prompt);
+    await log(`Check options: ${JSON.stringify(options)}`);
+    const result = await runPrerequisiteCheck(options, true);
+    await log(`Prerequisite check result: success=${result.success}`);
+    if (result.success && result.output) {
+      const context = formatPrereqContext(result);
+      await log(`Formatted context (length: ${context.length})`);
+      await log(`Context preview: ${context.substring(0, 200)}`);
+      const output = {
+        hookSpecificOutput: {
+          hookEventName: "UserPromptSubmit",
+          additionalContext: context
+        }
+      };
+      await log(`Returning success with additionalContext`);
+      console.log(JSON.stringify(output));
+    } else {
+      const errorMessage = formatPrereqError(result.error || "Unknown error");
+      await log(`Blocking with error: ${result.error}`);
+      const output = {
+        decision: "block",
+        reason: errorMessage,
+        hookSpecificOutput: {
+          hookEventName: "UserPromptSubmit"
+        }
+      };
+      console.log(JSON.stringify(output));
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    await log(`Hook error: ${errorMessage}`);
+    console.error(`PrePromptSubmit hook error: ${errorMessage}`);
+    console.log(JSON.stringify({}));
+  }
+}
+main2();
