@@ -59,7 +59,7 @@ Given that feature description, do this:
       - If no specs exist at all, start with 001
 
    e. **Detect multi-repo mode and prompt for spec location** (T063):
-      - Run: `speck-check-prerequisites --json --skip-feature-check`
+      - Run: `speck check-prerequisites --json --skip-feature-check`
       - Parse the JSON output and extract the `MODE` field
       - If `MODE` is `"multi-repo"`:
         - **Ask the user**: "Create spec at parent (shared across repos) or local (this repo only)? (parent/local)"

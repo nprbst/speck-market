@@ -63,7 +63,7 @@ This command supports the following flags for branch-aware task generation (US4)
 
    **Fallback**: If the comment is not present (VSCode hook bug), run:
    ```bash
-   speck-check-prerequisites --json
+   speck check-prerequisites --json
    ```
 
    **Fallback (VSCode hook bug)**: If the virtual command fails with exit code 127, run:

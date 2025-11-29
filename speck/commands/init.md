@@ -19,8 +19,9 @@ This command initializes Speck in the current repository and optionally installs
 1. **Creates `.speck/` directory** in the current repository with:
    - `memory/` - For constitution.md and other memory files
    - `scripts/` - For custom scripts
-2. **Installs CLI symlink** at `~/.local/bin/speck`
-3. **Suggests next step** - prompts to run `/speck:constitution` if needed
+2. **Configures plugin permissions** in `.claude/settings.local.json` to allow reading from Speck's template files without prompts (this file is gitignored)
+3. **Installs CLI symlink** at `~/.local/bin/speck`
+4. **Suggests next step** - prompts to run `/speck:constitution` if needed
 
 ### Run Initialization
 

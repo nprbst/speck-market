@@ -23,7 +23,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 
    **Fallback**: If the comment is not present (VSCode hook bug), run:
    ```bash
-   speck-check-prerequisites --json --require-tasks --include-tasks
+   speck check-prerequisites --json --require-tasks --include-tasks
    ```
    Parse FEATURE_DIR and AVAILABLE_DOCS list.
 

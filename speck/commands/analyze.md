@@ -34,7 +34,7 @@ Use FEATURE_DIR and AVAILABLE_DOCS from this JSON.
 
 **Fallback**: If the comment is not present (VSCode hook bug), run:
 ```bash
-speck-check-prerequisites --json --require-tasks --include-tasks
+speck check-prerequisites --json --require-tasks --include-tasks
 ```
 
 **Fallback (VSCode hook bug)**: If the virtual command fails with exit code 127, run:

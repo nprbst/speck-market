@@ -43,7 +43,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 
    **Fallback**: If the comment is not present (VSCode hook bug), run:
    ```bash
-   speck-check-prerequisites --json
+   speck check-prerequisites --json
    ```
 
    **Fallback (VSCode hook bug)**: If the virtual command fails with exit code 127, run:

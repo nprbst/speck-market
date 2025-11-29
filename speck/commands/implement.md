@@ -31,7 +31,7 @@ Parse command-line flags from user input:
 
    **Fallback**: If the comment is not present (VSCode hook bug), run:
    ```bash
-   speck-check-prerequisites --json --require-tasks --include-tasks
+   speck check-prerequisites --json --require-tasks --include-tasks
    ```
 
    **Fallback (VSCode hook bug)**: If the virtual command fails with exit code 127, run:

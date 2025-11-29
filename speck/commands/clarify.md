@@ -32,7 +32,7 @@ Execution steps:
 
    **Fallback**: If the comment is not present (VSCode hook bug), run:
    ```bash
-   speck-check-prerequisites --json --paths-only
+   speck check-prerequisites --json --paths-only
    ```
    Parse minimal JSON payload fields: FEATURE_DIR, FEATURE_SPEC.
    If JSON parsing fails, abort and instruct user to re-run `/speck:specify` or verify feature branch environment.

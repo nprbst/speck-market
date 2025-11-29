@@ -8528,7 +8528,7 @@ var exports_init = {};
 __export(exports_init, {
   main: () => main4
 });
-import { existsSync as existsSync7, mkdirSync as mkdirSync3, lstatSync, readlinkSync, unlinkSync, symlinkSync as symlinkSync2 } from "fs";
+import { existsSync as existsSync7, mkdirSync as mkdirSync3, lstatSync, readlinkSync, unlinkSync, symlinkSync as symlinkSync2, readFileSync as readFileSync3, writeFileSync as writeFileSync2 } from "fs";
 import { join as join4, dirname as dirname2, resolve as resolve2 } from "path";
 import { homedir } from "os";
 import { parseArgs as parseArgs3 } from "util";
@@ -8610,6 +8610,36 @@ function isRegularFile(path6) {
     return false;
   }
 }
+function configurePluginPermissions(repoRoot) {
+  const settingsPath = join4(repoRoot, ".claude", "settings.local.json");
+  const readPermission = "Read(~/.claude/plugins/marketplaces/speck-market/speck/templates/**)";
+  try {
+    const claudeDir = join4(repoRoot, ".claude");
+    if (!existsSync7(claudeDir)) {
+      mkdirSync3(claudeDir, { recursive: true });
+    }
+    let settings = {};
+    if (existsSync7(settingsPath)) {
+      const content = readFileSync3(settingsPath, "utf-8");
+      settings = JSON.parse(content);
+    }
+    if (!settings.permissions) {
+      settings.permissions = {};
+    }
+    if (!settings.permissions.allow) {
+      settings.permissions.allow = [];
+    }
+    if (settings.permissions.allow.includes(readPermission)) {
+      return false;
+    }
+    settings.permissions.allow.push(readPermission);
+    writeFileSync2(settingsPath, JSON.stringify(settings, null, 2) + `
+`);
+    return true;
+  } catch {
+    return false;
+  }
+}
 function runInit(options) {
   const bootstrapPath = getBootstrapPath();
   const inPath = isInPath();
@@ -8641,6 +8671,7 @@ Then run 'speck init' again.`,
     const constitutionPath = join4(speckResult.path, "memory", "constitution.md");
     needsConstitution = !existsSync7(constitutionPath);
   }
+  const permissionsConfigured = configurePluginPermissions(gitRoot);
   if (!existsSync7(bootstrapPath)) {
     return {
       success: false,
@@ -8655,17 +8686,26 @@ Then run 'speck init' again.`,
   }
   if (isValidSymlink(SYMLINK_PATH, bootstrapPath)) {
     if (!options.force) {
+      const alreadyInstalledMessages = [];
+      if (speckDirCreated) {
+        alreadyInstalledMessages.push(`\u2713 Created .speck/ directory`);
+      }
+      alreadyInstalledMessages.push(`\u2713 Speck CLI already installed at ${SYMLINK_PATH}`);
+      if (permissionsConfigured) {
+        alreadyInstalledMessages.push(`\u2713 Configured plugin template permissions in .claude/settings.local.json`);
+      }
       return {
         success: true,
         symlinkPath: SYMLINK_PATH,
         targetPath: bootstrapPath,
         inPath,
         alreadyInstalled: true,
-        message: speckDirCreated ? `\u2713 Created .speck/ directory
-\u2713 Speck CLI already installed at ${SYMLINK_PATH}` : `Speck is already installed at ${SYMLINK_PATH}`,
+        message: alreadyInstalledMessages.join(`
+`),
         pathInstructions,
         speckDirCreated,
         speckDirPath,
+        permissionsConfigured,
         nextStep: needsConstitution ? "Run /speck:constitution to set up your project principles." : undefined
       };
     }
@@ -8713,6 +8753,9 @@ Then run 'speck init' again.`,
     messages.push(`\u2713 .speck/ directory exists at ${speckDirPath}`);
   }
   messages.push(`\u2713 Speck CLI installed to ${SYMLINK_PATH}`);
+  if (permissionsConfigured) {
+    messages.push(`\u2713 Configured plugin template permissions in .claude/settings.local.json`);
+  }
   return {
     success: true,
     symlinkPath: SYMLINK_PATH,
@@ -8723,6 +8766,7 @@ Then run 'speck init' again.`,
     pathInstructions,
     speckDirCreated,
     speckDirPath,
+    permissionsConfigured,
     nextStep: needsConstitution ? "Run /speck:constitution to set up your project principles." : undefined
   };
 }
@@ -8736,7 +8780,8 @@ function formatOutput(result, options) {
         inPath: result.inPath,
         alreadyInstalled: result.alreadyInstalled,
         speckDirCreated: result.speckDirCreated,
-        speckDirPath: result.speckDirPath
+        speckDirPath: result.speckDirPath,
+        permissionsConfigured: result.permissionsConfigured
       },
       message: result.message,
       pathInstructions: result.pathInstructions,
@@ -8803,7 +8848,7 @@ var {
 } = import__.default;
 
 // src/cli/index.ts
-import { readFileSync as readFileSync3, existsSync as existsSync8 } from "fs";
+import { readFileSync as readFileSync4, existsSync as existsSync8 } from "fs";
 import { join as join5, dirname as dirname3 } from "path";
 var lazyCheckPrerequisites = () => init_check_prerequisites().then(() => exports_check_prerequisites);
 var lazyCreateNewFeature = () => init_create_new_feature().then(() => exports_create_new_feature);
@@ -8821,7 +8866,7 @@ function getVersion() {
     ];
     for (const pkgPath of possiblePaths) {
       if (existsSync8(pkgPath)) {
-        const pkg = JSON.parse(readFileSync3(pkgPath, "utf-8"));
+        const pkg = JSON.parse(readFileSync4(pkgPath, "utf-8"));
         if (pkg.version) {
           return pkg.version;
         }
