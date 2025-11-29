@@ -68,11 +68,11 @@ Given that feature description, do this:
       - If `MODE` is `"single-repo"`:
         - Set `SPEC_LOCATION = "local"` (no prompt needed)
 
-   f. Run the script `speck-create-new-feature --json "$ARGUMENTS"` with the calculated number and short-name:
+   f. Run the command `speck create-new-feature --json "$ARGUMENTS"` with the calculated number and short-name:
       - Pass `--number N+1` and `--short-name "your-short-name"` along with the feature description
       - **If multi-repo mode and user chose "parent"**: Add `--shared-spec` flag
       - **If multi-repo mode and user chose "local"**: Add `--local-spec` flag (or omit flag - local is default)
-      - Bash example: `speck-create-new-feature --json --number 5 --short-name "user-auth" --shared-spec "Add user authentication"`
+      - Bash example: `speck create-new-feature --json --number 5 --short-name "user-auth" --shared-spec "Add user authentication"`
 
    **IMPORTANT**:
    - First find the highest number across ALL specs/branches to determine the baseline

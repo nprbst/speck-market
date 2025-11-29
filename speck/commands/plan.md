@@ -134,7 +134,7 @@ Parse command-line flags from user input:
    - **Write to**: `{FEATURE_DIR}/contracts/` (shared artifacts, go to root in multi-repo)
 
 3. **Agent context update**:
-   - Run `speck-update-agent-context claude`
+   - Run `speck update-agent-context`
    - These scripts detect which AI agent is in use
    - Update the appropriate agent-specific context file
    - Add only new technology from current plan
