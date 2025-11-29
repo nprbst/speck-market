@@ -10,55 +10,22 @@ $ARGUMENTS
 
 You **MUST** consider the user input before proceeding (if not empty).
 
-## Speck CLI Installation
+## Speck Initialization
 
-This command installs the `speck` CLI globally by creating a symlink at `~/.local/bin/speck`.
+This command initializes Speck in the current repository and optionally installs the CLI globally.
 
-### Installation Flow
+### What This Does
 
-1. **Bootstrap Script**: The symlink initially points to `bootstrap.sh`
-2. **First Run**: Bootstrap detects Bun, creates `.runner.sh`, rewires the symlink
-3. **Subsequent Runs**: Symlink points directly to `.runner.sh` (zero overhead)
+1. **Creates `.speck/` directory** in the current repository with:
+   - `memory/` - For constitution.md and other memory files
+   - `scripts/` - For custom scripts
+2. **Installs CLI symlink** at `~/.local/bin/speck`
+3. **Suggests next step** - prompts to run `/speck:constitution` if needed
 
-### Run Installation
-
-```bash
-# Run the init command
-bun run src/cli/index.ts init
-
-# Or if speck is already available in PATH:
-# speck init
-```
-
-### Verify Installation
-
-After running, verify the installation:
+### Run Initialization
 
 ```bash
-# Check symlink exists
-ls -la ~/.local/bin/speck
-
-# Test the CLI
-~/.local/bin/speck --help
-```
-
-### PATH Configuration
-
-If `~/.local/bin` is not in your PATH, add this to your shell config:
-
-**For bash** (`~/.bashrc`):
-```bash
-export PATH="$HOME/.local/bin:$PATH"
-```
-
-**For zsh** (`~/.zshrc`):
-```bash
-export PATH="$HOME/.local/bin:$PATH"
-```
-
-Then reload your shell:
-```bash
-source ~/.bashrc  # or ~/.zshrc
+bun $HOME/.claude/plugins/marketplaces/speck-market/speck/dist/speck-cli.js init
 ```
 
 ### Options
@@ -66,13 +33,21 @@ source ~/.bashrc  # or ~/.zshrc
 - `--force`: Force reinstall even if symlink already exists
 - `--json`: Output result as JSON
 
-### Troubleshooting
+### PATH Configuration
 
-If installation fails:
+If `~/.local/bin` is not in your PATH, add this to your shell config:
 
-1. **Bun not installed**: The bootstrap script will show platform-specific install instructions
-2. **Permission denied**: Ensure you have write access to `~/.local/bin`
-3. **PATH not set**: Add `~/.local/bin` to your PATH as shown above
+**For bash** (`~/.bashrc`) or **zsh** (`~/.zshrc`):
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+Then reload: `source ~/.bashrc` or `source ~/.zshrc`
+
+### Next Steps
+
+After initialization, follow the suggested next step to set up your project constitution:
+- Run `/speck:constitution` to define your project principles
 
 ## Context
 
