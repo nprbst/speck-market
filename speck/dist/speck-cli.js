@@ -8188,7 +8188,13 @@ async function main2(args) {
       }
     }
   }
-  const featureDir = path4.join(specsDir, specId);
+  let actualSpecsDir;
+  if (useWorktree && worktreePath) {
+    actualSpecsDir = path4.join(worktreePath, "specs");
+  } else {
+    actualSpecsDir = specsDir;
+  }
+  const featureDir = path4.join(actualSpecsDir, specId);
   mkdirSync2(featureDir, { recursive: true });
   const template = path4.join(getTemplatesDir(), "spec-template.md");
   const specFile = path4.join(featureDir, "spec.md");
@@ -8612,7 +8618,6 @@ function isRegularFile(path6) {
 }
 function configurePluginPermissions(repoRoot) {
   const settingsPath = join4(repoRoot, ".claude", "settings.local.json");
-  const readPermission = "Read(~/.claude/plugins/marketplaces/speck-market/speck/templates/**)";
   try {
     const claudeDir = join4(repoRoot, ".claude");
     if (!existsSync7(claudeDir)) {
@@ -8629,15 +8634,20 @@ function configurePluginPermissions(repoRoot) {
     if (!settings.permissions.allow) {
       settings.permissions.allow = [];
     }
-    if (settings.permissions.allow.includes(readPermission)) {
-      return false;
+    let addedCount = 0;
+    for (const permission of DEFAULT_ALLOWED_PERMISSIONS) {
+      if (!settings.permissions.allow.includes(permission)) {
+        settings.permissions.allow.push(permission);
+        addedCount++;
+      }
     }
-    settings.permissions.allow.push(readPermission);
-    writeFileSync2(settingsPath, JSON.stringify(settings, null, 2) + `
+    if (addedCount > 0) {
+      writeFileSync2(settingsPath, JSON.stringify(settings, null, 2) + `
 `);
-    return true;
+    }
+    return addedCount;
   } catch {
-    return false;
+    return 0;
   }
 }
 function runInit(options) {
@@ -8691,8 +8701,8 @@ Then run 'speck init' again.`,
         alreadyInstalledMessages.push(`\u2713 Created .speck/ directory`);
       }
       alreadyInstalledMessages.push(`\u2713 Speck CLI already installed at ${SYMLINK_PATH}`);
-      if (permissionsConfigured) {
-        alreadyInstalledMessages.push(`\u2713 Configured plugin template permissions in .claude/settings.local.json`);
+      if (permissionsConfigured > 0) {
+        alreadyInstalledMessages.push(`\u2713 Added ${permissionsConfigured} permission(s) to .claude/settings.local.json`);
       }
       return {
         success: true,
@@ -8753,8 +8763,8 @@ Then run 'speck init' again.`,
     messages.push(`\u2713 .speck/ directory exists at ${speckDirPath}`);
   }
   messages.push(`\u2713 Speck CLI installed to ${SYMLINK_PATH}`);
-  if (permissionsConfigured) {
-    messages.push(`\u2713 Configured plugin template permissions in .claude/settings.local.json`);
+  if (permissionsConfigured > 0) {
+    messages.push(`\u2713 Added ${permissionsConfigured} permission(s) to .claude/settings.local.json`);
   }
   return {
     success: true,
@@ -8820,13 +8830,22 @@ async function main4(args) {
   console.log(formatOutput(result, options));
   return result.success ? 0 : 1;
 }
-var LOCAL_BIN_DIR, SYMLINK_PATH, SPECK_SUBDIRS;
+var LOCAL_BIN_DIR, SYMLINK_PATH, SPECK_SUBDIRS, DEFAULT_ALLOWED_PERMISSIONS;
 var init_init = __esm(() => {
   LOCAL_BIN_DIR = join4(homedir(), ".local", "bin");
   SYMLINK_PATH = join4(LOCAL_BIN_DIR, "speck");
   SPECK_SUBDIRS = [
     "memory",
     "scripts"
+  ];
+  DEFAULT_ALLOWED_PERMISSIONS = [
+    "Read(~/.claude/plugins/marketplaces/speck-market/speck/templates/**)",
+    "Bash(git diff:*)",
+    "Bash(git fetch:*)",
+    "Bash(git log:*)",
+    "Bash(git ls-remote:*)",
+    "Bash(git ls:*)",
+    "Bash(git status)"
   ];
   if (false) {}
 });
@@ -8886,7 +8905,7 @@ function processGlobalOptions(options) {
     globalState.outputMode = "human";
   }
 }
-function buildSubcommandArgs(args, options) {
+function buildSubcommandArgs(args, options, rawArgs) {
   const result = [...args];
   if (options.json || globalState.outputMode === "json") {
     result.push("--json");
@@ -8894,6 +8913,17 @@ function buildSubcommandArgs(args, options) {
   for (const [key, value] of Object.entries(options)) {
     if (key === "json" || key === "hook")
       continue;
+    if (key === "worktree") {
+      const hasWorktreeFlag = rawArgs?.some((arg) => arg === "--worktree" || arg === "--no-worktree");
+      if (hasWorktreeFlag) {
+        if (value === true) {
+          result.push("--worktree");
+        } else if (value === false) {
+          result.push("--no-worktree");
+        }
+      }
+      continue;
+    }
     if (value === true) {
       result.push(`--${key.replace(/([A-Z])/g, "-$1").toLowerCase()}`);
     } else if (value !== false && value !== undefined) {
@@ -8914,9 +8944,10 @@ function createProgram() {
     const exitCode = await module.main(args);
     process.exit(exitCode);
   });
-  program2.command("create-new-feature").description("Create a new feature specification directory").argument("<description>", "Feature description").option("--json", "Output in JSON format").option("--short-name <name>", "Custom short name for the branch").option("--number <n>", "Specify branch number manually", parseInt).option("--shared-spec", "Create spec at speckRoot (multi-repo shared spec)").option("--local-spec", "Create spec locally in child repo").option("--no-worktree", "Skip worktree creation").option("--no-ide", "Skip IDE auto-launch").action(async (description, options) => {
+  program2.command("create-new-feature").description("Create a new feature specification directory").argument("<description>", "Feature description").option("--json", "Output in JSON format").option("--short-name <name>", "Custom short name for the branch").option("--number <n>", "Specify branch number manually", parseInt).option("--shared-spec", "Create spec at speckRoot (multi-repo shared spec)").option("--local-spec", "Create spec locally in child repo").option("--worktree", "Create a worktree for the feature branch (overrides config)").option("--no-worktree", "Skip worktree creation (overrides config)").option("--no-ide", "Skip IDE auto-launch").action(async (description, options, command) => {
     const module = await lazyCreateNewFeature();
-    const args = [description, ...buildSubcommandArgs([], options)];
+    const rawArgs = command.args.concat(process.argv.slice(3));
+    const args = [description, ...buildSubcommandArgs([], options, rawArgs)];
     const exitCode = await module.main(args);
     process.exit(exitCode);
   });

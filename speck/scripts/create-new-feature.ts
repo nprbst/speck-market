@@ -747,10 +747,21 @@ export async function main(args: string[]): Promise<number> {
   // (handled by if condition above - only runs for shared specs)
   // [SPECK-EXTENSION:END]
 
-  // [SPECK-EXTENSION:START] T064-T066: Handle shared vs local spec creation
-  // Create feature directory at the determined location (shared or local)
+  // [SPECK-EXTENSION:START] T064-T066, T119: Handle shared vs local spec creation
+  // T119: In worktree mode, write spec to worktree's specs/ directory (not main repo)
+  // This ensures spec.md is created on the feature branch, not main
+  let actualSpecsDir: string;
+  if (useWorktree && worktreePath) {
+    // Worktree mode: spec goes into worktree's specs/ directory
+    actualSpecsDir = path.join(worktreePath, "specs");
+  } else {
+    // Non-worktree mode: use previously determined specsDir (repoRoot or speckRoot)
+    actualSpecsDir = specsDir;
+  }
+
+  // Create feature directory at the determined location
   // T081: Use specId for directory (always NNN-short-name format, even with custom branch)
-  const featureDir = path.join(specsDir, specId);
+  const featureDir = path.join(actualSpecsDir, specId);
   mkdirSync(featureDir, { recursive: true });
 
   // Copy template to the spec location

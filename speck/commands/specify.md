@@ -81,7 +81,8 @@ Given that feature description, do this:
    - This ensures sequential numbering across all features while respecting existing short-name versions
    - You must only ever run the create-new-feature script once per feature
    - The JSON is provided in the terminal as output - always refer to it to get the actual content you're looking for
-   - The JSON output will contain BRANCH_NAME and SPEC_FILE paths
+   - The JSON output will contain BRANCH_NAME, SPEC_FILE, and optionally WORKTREE_PATH
+   - **CRITICAL**: The SPEC_FILE path is an **absolute path** - use it exactly as returned. In worktree mode, SPEC_FILE points to the worktree's specs/ directory (NOT the main repo).
    - For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\''m Groot' (or double-quote if possible: "I'm Groot")
 
    g. **[SPECK-EXTENSION] Worktree Integration** (Optional - enabled when worktree.enabled = true in .speck/config.json):
@@ -131,11 +132,13 @@ Given that feature description, do this:
     7. Identify Key Entities (if data involved)
     8. Return: SUCCESS (spec ready for planning)
 
-5. Write the specification to SPEC_FILE using the template structure, replacing placeholders with concrete details derived from the feature description (arguments) while preserving section order and headings.
+5. Write the specification to the **absolute SPEC_FILE path** from the JSON output using the template structure, replacing placeholders with concrete details derived from the feature description (arguments) while preserving section order and headings.
+
+   **IMPORTANT**: Always use the exact SPEC_FILE path returned by `create-new-feature`. Do NOT construct a relative path like `specs/NNN-name/spec.md` - the script may have created the spec in a worktree directory, and SPEC_FILE contains the correct absolute path.
 
 6. **Specification Quality Validation**: After writing the initial spec, validate it against quality criteria:
 
-   a. **Create Spec Quality Checklist**: Generate a checklist file at `FEATURE_DIR/checklists/requirements.md` using the checklist template structure with these validation items:
+   a. **Create Spec Quality Checklist**: Generate a checklist file at `FEATURE_DIR/checklists/requirements.md` using the checklist template structure with these validation items (FEATURE_DIR is the directory containing SPEC_FILE, e.g., if SPEC_FILE is `/path/to/specs/001-auth/spec.md`, then FEATURE_DIR is `/path/to/specs/001-auth/`):
 
       ```markdown
       # Specification Quality Checklist: [FEATURE NAME]

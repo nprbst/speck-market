@@ -51,8 +51,12 @@ Then reload: `source ~/.bashrc` or `source ~/.zshrc`
 
 ### Next Steps
 
-After initialization, follow the suggested next step to set up your project constitution:
-- Run `/speck:constitution` to define your project principles
+After initialization completes successfully:
+
+1. **Restart Claude Code** - Exit this session and start a new one for permission changes to take effect
+2. **Set up your constitution** - Run `/speck:constitution` to define your project principles
+
+**Important**: The permission configuration in `.claude/settings.local.json` requires a Claude Code restart to take effect. Without restarting, you may still see permission prompts when reading template files.
 
 ## Context
 
