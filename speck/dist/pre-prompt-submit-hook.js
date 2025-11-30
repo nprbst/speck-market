@@ -544,6 +544,7 @@ EXAMPLES:
 `);
 }
 function outputPathsOnly(paths, jsonMode) {
+  const templatesDir = getTemplatesDir();
   if (jsonMode) {
     const output = {
       MODE: paths.MODE,
@@ -552,7 +553,8 @@ function outputPathsOnly(paths, jsonMode) {
       FEATURE_DIR: paths.FEATURE_DIR,
       FEATURE_SPEC: paths.FEATURE_SPEC,
       IMPL_PLAN: paths.IMPL_PLAN,
-      TASKS: paths.TASKS
+      TASKS: paths.TASKS,
+      TEMPLATES_DIR: templatesDir
     };
     console.log(JSON.stringify(output));
   } else {
@@ -563,6 +565,7 @@ function outputPathsOnly(paths, jsonMode) {
     console.log(`FEATURE_SPEC: ${paths.FEATURE_SPEC}`);
     console.log(`IMPL_PLAN: ${paths.IMPL_PLAN}`);
     console.log(`TASKS: ${paths.TASKS}`);
+    console.log(`TEMPLATES_DIR: ${templatesDir}`);
   }
 }
 function checkForUnknownOptions(args, _outputMode) {

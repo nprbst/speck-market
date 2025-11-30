@@ -73,6 +73,7 @@ interface PathsOnlyOutput {
   FEATURE_SPEC: string;
   IMPL_PLAN: string;
   TASKS: string;
+  TEMPLATES_DIR: string;
 }
 
 /**
@@ -199,6 +200,7 @@ EXAMPLES:
  * Output paths only (no validation)
  */
 function outputPathsOnly(paths: FeaturePaths, jsonMode: boolean): void {
+  const templatesDir = getTemplatesDir();
   if (jsonMode) {
     const output: PathsOnlyOutput = {
       MODE: paths.MODE,
@@ -208,6 +210,7 @@ function outputPathsOnly(paths: FeaturePaths, jsonMode: boolean): void {
       FEATURE_SPEC: paths.FEATURE_SPEC,
       IMPL_PLAN: paths.IMPL_PLAN,
       TASKS: paths.TASKS,
+      TEMPLATES_DIR: templatesDir,
     };
     console.log(JSON.stringify(output));
   } else {
@@ -218,6 +221,7 @@ function outputPathsOnly(paths: FeaturePaths, jsonMode: boolean): void {
     console.log(`FEATURE_SPEC: ${paths.FEATURE_SPEC}`);
     console.log(`IMPL_PLAN: ${paths.IMPL_PLAN}`);
     console.log(`TASKS: ${paths.TASKS}`);
+    console.log(`TEMPLATES_DIR: ${templatesDir}`);
   }
 }
 
