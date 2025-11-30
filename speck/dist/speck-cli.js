@@ -9803,6 +9803,252 @@ var init_update_agent_context = __esm(async () => {
   if (false) {}
 });
 
+// .speck/scripts/next-feature.ts
+var exports_next_feature = {};
+__export(exports_next_feature, {
+  main: () => main8
+});
+import { existsSync as existsSync12, readdirSync as readdirSync4 } from "fs";
+import path8 from "path";
+var {$: $6 } = globalThis.Bun;
+function parseArgs6(args) {
+  const options = {
+    json: false,
+    shortName: undefined,
+    help: false
+  };
+  let i = 0;
+  while (i < args.length) {
+    const arg = args[i];
+    if (arg === "--json") {
+      options.json = true;
+      i++;
+    } else if (arg === "--short-name") {
+      if (i + 1 >= args.length || args[i + 1]?.startsWith("--")) {
+        return { success: false, error: "--short-name requires a value" };
+      }
+      options.shortName = args[i + 1];
+      i += 2;
+    } else if (arg === "--help" || arg === "-h") {
+      options.help = true;
+      i++;
+    } else {
+      return { success: false, error: `Unknown argument: ${arg}` };
+    }
+  }
+  return { success: true, options };
+}
+function showHelp5() {
+  const scriptName = path8.basename(process.argv[1]);
+  console.log(`Usage: ${scriptName} [--json] [--short-name <name>]
+
+Computes the next available feature number and detects multi-repo mode.
+This command should be called before create-new-feature to determine
+the next feature number without verbose git output.
+
+Options:
+  --json              Output in JSON format (structured JSON envelope)
+  --short-name <name> Short name to check for existing branches (optional)
+  --help, -h          Show this help message
+
+Output (JSON mode):
+  NEXT_NUMBER   Next available feature number
+  BRANCH_NAME   Suggested branch name (NNN-short-name format)
+  MODE          "single-repo" or "multi-repo"
+  SPECS_DIR     Path to the specs directory
+
+Examples:
+  ${scriptName} --json --short-name "user-auth"
+  ${scriptName} --json`);
+}
+function outputError4(code, message, outputMode, startTime, recovery) {
+  if (outputMode === "json") {
+    const output = formatJsonOutput({
+      success: false,
+      error: { code, message, recovery },
+      command: "next-feature",
+      startTime
+    });
+    console.log(JSON.stringify(output));
+  } else {
+    console.error(`Error: ${message}`);
+  }
+}
+function getHighestFromSpecs2(specsDir) {
+  let highest = 0;
+  if (existsSync12(specsDir)) {
+    const dirs = readdirSync4(specsDir, { withFileTypes: true });
+    for (const dir of dirs) {
+      if (dir.isDirectory()) {
+        const match = dir.name.match(/^(\d+)/);
+        if (match && match[1]) {
+          const num = parseInt(match[1], 10);
+          if (num > highest) {
+            highest = num;
+          }
+        }
+      }
+    }
+  }
+  return highest;
+}
+async function getHighestFromRemotes() {
+  let highest = 0;
+  try {
+    const result = await $6`git ls-remote --heads origin`.quiet();
+    const lines = result.text().split(`
+`);
+    for (const line of lines) {
+      const match = line.match(/refs\/heads\/(\d+)-/);
+      if (match && match[1]) {
+        const num = parseInt(match[1], 10);
+        if (num > highest) {
+          highest = num;
+        }
+      }
+    }
+  } catch {}
+  return highest;
+}
+async function getHighestFromLocalBranches() {
+  let highest = 0;
+  try {
+    const result = await $6`git branch`.quiet();
+    const branches = result.text().split(`
+`);
+    for (const branch of branches) {
+      const match = branch.match(/^[* ]*(\d+)-/);
+      if (match && match[1]) {
+        const num = parseInt(match[1], 10);
+        if (num > highest) {
+          highest = num;
+        }
+      }
+    }
+  } catch {}
+  return highest;
+}
+async function checkShortNameExists(shortName, specsDir) {
+  let maxNum = 0;
+  try {
+    const result = await $6`git ls-remote --heads origin`.quiet();
+    const lines = result.text().split(`
+`);
+    for (const line of lines) {
+      const match = line.match(new RegExp(`refs/heads/(\\d+)-${shortName}$`));
+      if (match && match[1]) {
+        const num = parseInt(match[1], 10);
+        if (num > maxNum) {
+          maxNum = num;
+        }
+      }
+    }
+  } catch {}
+  try {
+    const result = await $6`git branch`.quiet();
+    const branches = result.text().split(`
+`);
+    for (const branch of branches) {
+      const match = branch.match(new RegExp(`^[* ]*?(\\d+)-${shortName}$`));
+      if (match && match[1]) {
+        const num = parseInt(match[1], 10);
+        if (num > maxNum) {
+          maxNum = num;
+        }
+      }
+    }
+  } catch {}
+  if (existsSync12(specsDir)) {
+    const dirs = readdirSync4(specsDir, { withFileTypes: true });
+    for (const dir of dirs) {
+      if (dir.isDirectory()) {
+        const match = dir.name.match(new RegExp(`^(\\d+)-${shortName}$`));
+        if (match && match[1]) {
+          const num = parseInt(match[1], 10);
+          if (num > maxNum) {
+            maxNum = num;
+          }
+        }
+      }
+    }
+  }
+  return maxNum;
+}
+function cleanShortName(name) {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+/g, "-").replace(/^-/, "").replace(/-$/, "");
+}
+async function main8(args) {
+  const startTime = Date.now();
+  const parseResult = parseArgs6(args);
+  if (!parseResult.success) {
+    const hasJsonFlag = args.includes("--json");
+    const outputMode2 = detectOutputMode({ json: hasJsonFlag, hook: false });
+    outputError4("INVALID_ARGS", parseResult.error, outputMode2, startTime);
+    return 1 /* USER_ERROR */;
+  }
+  const options = parseResult.options;
+  const outputMode = detectOutputMode({ json: options.json, hook: false });
+  if (options.help) {
+    showHelp5();
+    return 0 /* SUCCESS */;
+  }
+  const config = await detectSpeckRoot();
+  const specsDir = config.specsDir;
+  const mode = config.mode;
+  try {
+    await $6`git fetch --all --prune`.quiet();
+  } catch {}
+  const [highestRemote, highestLocal, highestSpecs] = await Promise.all([
+    getHighestFromRemotes(),
+    getHighestFromLocalBranches(),
+    Promise.resolve(getHighestFromSpecs2(specsDir))
+  ]);
+  const highestOverall = Math.max(highestRemote, highestLocal, highestSpecs);
+  let nextNumber;
+  if (options.shortName) {
+    const cleanedShortName = cleanShortName(options.shortName);
+    const existingShortNameNum = await checkShortNameExists(cleanedShortName, specsDir);
+    if (existingShortNameNum > 0) {
+      nextNumber = existingShortNameNum + 1;
+    } else {
+      nextNumber = highestOverall + 1;
+    }
+  } else {
+    nextNumber = highestOverall + 1;
+  }
+  if (nextNumber < 1) {
+    nextNumber = 1;
+  }
+  const featureNum = nextNumber.toString().padStart(3, "0");
+  const branchName = options.shortName ? `${featureNum}-${cleanShortName(options.shortName)}` : featureNum;
+  const outputData = {
+    NEXT_NUMBER: nextNumber,
+    BRANCH_NAME: branchName,
+    MODE: mode,
+    SPECS_DIR: specsDir
+  };
+  if (outputMode === "json") {
+    const output = formatJsonOutput({
+      success: true,
+      data: outputData,
+      command: "next-feature",
+      startTime
+    });
+    console.log(JSON.stringify(output));
+  } else {
+    console.log(`NEXT_NUMBER: ${nextNumber}`);
+    console.log(`BRANCH_NAME: ${branchName}`);
+    console.log(`MODE: ${mode}`);
+    console.log(`SPECS_DIR: ${specsDir}`);
+  }
+  return 0 /* SUCCESS */;
+}
+var init_next_feature = __esm(async () => {
+  init_cli_interface();
+  init_paths();
+  if (false) {}
+});
+
 // node_modules/commander/esm.mjs
 var import__ = __toESM(require_commander(), 1);
 var {
@@ -9820,7 +10066,7 @@ var {
 } = import__.default;
 
 // src/cli/index.ts
-import { readFileSync as readFileSync6, existsSync as existsSync12 } from "fs";
+import { readFileSync as readFileSync6, existsSync as existsSync13 } from "fs";
 import { join as join6, dirname as dirname3 } from "path";
 var lazyCheckPrerequisites = () => init_check_prerequisites().then(() => exports_check_prerequisites);
 var lazyCreateNewFeature = () => init_create_new_feature().then(() => exports_create_new_feature);
@@ -9830,6 +10076,7 @@ var lazyLinkCommand = () => Promise.resolve().then(() => (init_link(), exports_l
 var lazyLaunchIDECommand = () => Promise.resolve().then(() => (init_cli_launch_ide(), exports_cli_launch_ide));
 var lazySetupPlan = () => init_setup_plan().then(() => exports_setup_plan);
 var lazyUpdateAgentContext = () => init_update_agent_context().then(() => exports_update_agent_context);
+var lazyNextFeature = () => init_next_feature().then(() => exports_next_feature);
 var globalState = {
   outputMode: "human"
 };
@@ -9841,7 +10088,7 @@ function getVersion() {
       join6(process.cwd(), "package.json")
     ];
     for (const pkgPath of possiblePaths) {
-      if (existsSync12(pkgPath)) {
+      if (existsSync13(pkgPath)) {
         const pkg = JSON.parse(readFileSync6(pkgPath, "utf-8"));
         if (pkg.version) {
           return pkg.version;
@@ -9907,9 +10154,9 @@ function createProgram() {
     const exitCode = await module.main(args);
     process.exit(exitCode);
   });
-  program2.command("link").description("Link repository to multi-repo speck root").argument("<path>", "Path to speck root directory").option("--json", "Output in JSON format").action(async (path8, options) => {
+  program2.command("link").description("Link repository to multi-repo speck root").argument("<path>", "Path to speck root directory").option("--json", "Output in JSON format").action(async (path9, options) => {
     const module = await lazyLinkCommand();
-    const args = [path8, ...buildSubcommandArgs([], options)];
+    const args = [path9, ...buildSubcommandArgs([], options)];
     const exitCode = await module.main(args);
     process.exit(exitCode);
   });
@@ -9952,6 +10199,12 @@ function createProgram() {
     const exitCode = await module.main(args);
     process.exit(exitCode);
   });
+  program2.command("next-feature").description("Get next feature number and detect multi-repo mode").option("--json", "Output in JSON format").option("--short-name <name>", "Short name to check for existing branches").action(async (options) => {
+    const module = await lazyNextFeature();
+    const args = buildSubcommandArgs([], options);
+    const exitCode = await module.main(args);
+    process.exit(exitCode);
+  });
   program2.command("help [command]").description("Display help for command").action((cmdName) => {
     if (cmdName) {
       const cmd = program2.commands.find((c) => c.name() === cmdName);
@@ -9972,14 +10225,14 @@ function createProgram() {
   });
   return program2;
 }
-async function main8() {
+async function main9() {
   const program2 = createProgram();
   if (process.argv.length === 2) {
     program2.help();
   }
   await program2.parseAsync(process.argv);
 }
-main8().catch((error) => {
+main9().catch((error) => {
   const message = error instanceof Error ? error.message : String(error);
   console.error("Fatal error:", message);
   process.exit(1);
