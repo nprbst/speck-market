@@ -7334,7 +7334,7 @@ async function constructWorktreePath(repoPath, _config, branchName) {
 var init_naming = () => {};
 
 // .speck/scripts/worktree/handoff.ts
-import { mkdirSync, existsSync as existsSync4, renameSync, readFileSync as readFileSync2, writeFileSync, chmodSync } from "fs";
+import { mkdirSync, existsSync as existsSync4, renameSync, readFileSync as readFileSync2, writeFileSync, chmodSync, copyFileSync } from "fs";
 import path2 from "path";
 function createHandoffDocument(options) {
   const { featureName, branchName, specPath, context, status } = options;
@@ -7388,7 +7388,15 @@ ${doc.nextStep}
 
 ---
 
-*This handoff document was automatically generated. It will be archived after loading.*
+## After Loading
+
+Once you have read and understood this handoff context, rename this file:
+
+\`\`\`bash
+mv .speck/handoff.md .speck/handoff.done.md
+\`\`\`
+
+This prevents re-loading the same handoff in future sessions.
 `;
   return yamlFrontmatter + `
 ` + markdownContent.trim() + `
@@ -7405,7 +7413,28 @@ function writeWorktreeHandoff(worktreePath, options) {
   writeFileSync(path2.join(worktreePath, HANDOFF_FILE_PATH), markdown);
   const claudeDir = path2.join(worktreePath, ".claude");
   mkdirSync(claudeDir, { recursive: true });
-  writeFileSync(path2.join(worktreePath, CLAUDE_SETTINGS_PATH), JSON.stringify(CLAUDE_SETTINGS_TEMPLATE, null, 2));
+  const settingsPath = path2.join(worktreePath, CLAUDE_SETTINGS_PATH);
+  let existingSettings = {};
+  try {
+    if (existsSync4(settingsPath)) {
+      existingSettings = JSON.parse(readFileSync2(settingsPath, "utf-8"));
+    }
+  } catch {}
+  const mergedSettings = {
+    ...existingSettings,
+    hooks: {
+      ...existingSettings.hooks || {},
+      ...CLAUDE_SETTINGS_TEMPLATE.hooks
+    }
+  };
+  writeFileSync(settingsPath, JSON.stringify(mergedSettings, null, 2));
+  if (options.repoRoot) {
+    const localSettingsSrc = path2.join(options.repoRoot, CLAUDE_SETTINGS_LOCAL_PATH);
+    const localSettingsDst = path2.join(worktreePath, CLAUDE_SETTINGS_LOCAL_PATH);
+    if (existsSync4(localSettingsSrc)) {
+      copyFileSync(localSettingsSrc, localSettingsDst);
+    }
+  }
   const scriptsDir = path2.join(worktreePath, ".claude", "scripts");
   mkdirSync(scriptsDir, { recursive: true });
   const hookScriptPath = path2.join(worktreePath, HOOK_SCRIPT_PATH);
@@ -7415,7 +7444,7 @@ function writeWorktreeHandoff(worktreePath, options) {
   mkdirSync(vscodeDir, { recursive: true });
   writeFileSync(path2.join(worktreePath, VSCODE_TASKS_PATH), JSON.stringify(VSCODE_TASKS_TEMPLATE, null, 2));
 }
-var HandoffDocumentSchema, HANDOFF_FILE_PATH = ".speck/handoff.md", CLAUDE_SETTINGS_PATH = ".claude/settings.json", HOOK_SCRIPT_PATH = ".claude/scripts/handoff.sh", VSCODE_TASKS_PATH = ".vscode/tasks.json", CLAUDE_SETTINGS_TEMPLATE, VSCODE_TASKS_TEMPLATE, HANDOFF_HOOK_SCRIPT = `#!/bin/bash
+var HandoffDocumentSchema, HANDOFF_FILE_PATH = ".speck/handoff.md", CLAUDE_SETTINGS_PATH = ".claude/settings.json", CLAUDE_SETTINGS_LOCAL_PATH = ".claude/settings.local.json", HOOK_SCRIPT_PATH = ".claude/scripts/handoff.sh", VSCODE_TASKS_PATH = ".vscode/tasks.json", CLAUDE_SETTINGS_TEMPLATE, VSCODE_TASKS_TEMPLATE, HANDOFF_HOOK_SCRIPT = `#!/bin/bash
 
 HANDOFF_FILE="$CLAUDE_PROJECT_DIR/.speck/handoff.md"
 SETTINGS_FILE="$CLAUDE_PROJECT_DIR/.claude/settings.json"
@@ -7746,7 +7775,7 @@ var exports_create_new_feature = {};
 __export(exports_create_new_feature, {
   main: () => main2
 });
-import { existsSync as existsSync6, mkdirSync as mkdirSync2, readdirSync as readdirSync3, copyFileSync, symlinkSync } from "fs";
+import { existsSync as existsSync6, mkdirSync as mkdirSync2, readdirSync as readdirSync3, copyFileSync as copyFileSync2, symlinkSync } from "fs";
 import path4 from "path";
 var {$: $3 } = globalThis.Bun;
 function parseArgs2(args) {
@@ -8165,7 +8194,8 @@ async function main2(args) {
             branchName,
             specPath: relativeSpecPath,
             context: options.featureDescription,
-            status: "not-started"
+            status: "not-started",
+            repoRoot
           });
           if (outputMode === "human") {
             console.log(`[speck] Written handoff artifacts to worktree`);
@@ -8278,7 +8308,7 @@ async function main2(args) {
   const template = path4.join(getTemplatesDir(), "spec-template.md");
   const specFile = path4.join(featureDir, "spec.md");
   if (existsSync6(template)) {
-    copyFileSync(template, specFile);
+    copyFileSync2(template, specFile);
   } else {
     await Bun.write(specFile, "");
   }
@@ -9480,7 +9510,7 @@ var exports_setup_plan = {};
 __export(exports_setup_plan, {
   main: () => main7
 });
-import { existsSync as existsSync10, mkdirSync as mkdirSync5, copyFileSync as copyFileSync2 } from "fs";
+import { existsSync as existsSync10, mkdirSync as mkdirSync5, copyFileSync as copyFileSync3 } from "fs";
 import path6 from "path";
 var {$: $5 } = globalThis.Bun;
 function parseArgs6(args) {
@@ -9557,7 +9587,7 @@ async function main7(args) {
   if (existsSync10(template)) {
     const implPlanDir = path6.dirname(paths.IMPL_PLAN);
     mkdirSync5(implPlanDir, { recursive: true });
-    copyFileSync2(template, paths.IMPL_PLAN);
+    copyFileSync3(template, paths.IMPL_PLAN);
     console.log(`Copied plan template to ${paths.IMPL_PLAN}`);
   } else {
     console.log(`Warning: Plan template not found at ${template}`);

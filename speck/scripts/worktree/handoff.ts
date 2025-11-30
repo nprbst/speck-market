@@ -10,7 +10,7 @@
  */
 
 import { z } from "zod";
-import { mkdirSync, existsSync, renameSync, readFileSync, writeFileSync, chmodSync } from "node:fs";
+import { mkdirSync, existsSync, renameSync, readFileSync, writeFileSync, chmodSync, copyFileSync } from "node:fs";
 import path from "node:path";
 import { $ } from "bun";
 
@@ -75,6 +75,11 @@ export const HANDOFF_DONE_PATH = ".speck/handoff.done.md";
  * Claude settings file location
  */
 export const CLAUDE_SETTINGS_PATH = ".claude/settings.json";
+
+/**
+ * Claude local settings file location (machine-specific, not tracked by git)
+ */
+export const CLAUDE_SETTINGS_LOCAL_PATH = ".claude/settings.local.json";
 
 /**
  * Hook script location
@@ -268,7 +273,15 @@ ${doc.nextStep}
 
 ---
 
-*This handoff document was automatically generated. It will be archived after loading.*
+## After Loading
+
+Once you have read and understood this handoff context, rename this file:
+
+\`\`\`bash
+mv .speck/handoff.md .speck/handoff.done.md
+\`\`\`
+
+This prevents re-loading the same handoff in future sessions.
 `;
 
   return yamlFrontmatter + "\n" + markdownContent.trim() + "\n";
@@ -427,6 +440,8 @@ export interface WriteWorktreeHandoffOptions {
   context: string;
   /** Current implementation status (optional) */
   status?: HandoffDocument["status"];
+  /** Path to main repository (for copying settings.local.json) */
+  repoRoot?: string;
 }
 
 /**
@@ -447,13 +462,39 @@ export function writeWorktreeHandoff(
   mkdirSync(speckDir, { recursive: true });
   writeFileSync(path.join(worktreePath, HANDOFF_FILE_PATH), markdown);
 
-  // T048c: Write .claude/settings.json with SessionStart hook
+  // T048c: Write .claude/settings.json - merge with existing (preserve checked-in settings)
   const claudeDir = path.join(worktreePath, ".claude");
   mkdirSync(claudeDir, { recursive: true });
-  writeFileSync(
-    path.join(worktreePath, CLAUDE_SETTINGS_PATH),
-    JSON.stringify(CLAUDE_SETTINGS_TEMPLATE, null, 2)
-  );
+
+  const settingsPath = path.join(worktreePath, CLAUDE_SETTINGS_PATH);
+  let existingSettings: Record<string, unknown> = {};
+  try {
+    if (existsSync(settingsPath)) {
+      existingSettings = JSON.parse(readFileSync(settingsPath, "utf-8"));
+    }
+  } catch {
+    // If parse fails, start fresh
+  }
+
+  // Merge: preserve existing settings, add/update hooks from template
+  const mergedSettings = {
+    ...existingSettings,
+    hooks: {
+      ...((existingSettings.hooks as Record<string, unknown>) || {}),
+      ...CLAUDE_SETTINGS_TEMPLATE.hooks,
+    },
+  };
+
+  writeFileSync(settingsPath, JSON.stringify(mergedSettings, null, 2));
+
+  // Copy settings.local.json from main repo if it exists
+  if (options.repoRoot) {
+    const localSettingsSrc = path.join(options.repoRoot, CLAUDE_SETTINGS_LOCAL_PATH);
+    const localSettingsDst = path.join(worktreePath, CLAUDE_SETTINGS_LOCAL_PATH);
+    if (existsSync(localSettingsSrc)) {
+      copyFileSync(localSettingsSrc, localSettingsDst);
+    }
+  }
 
   // T048b: Write .claude/scripts/handoff.sh
   const scriptsDir = path.join(worktreePath, ".claude", "scripts");
@@ -568,6 +609,7 @@ export async function createWorktreeWithHandoff(
         specPath,
         context,
         status,
+        repoRoot: repoPath,
       });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);

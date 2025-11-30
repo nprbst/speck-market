@@ -614,6 +614,7 @@ export async function main(args: string[]): Promise<number> {
             specPath: relativeSpecPath,
             context: options.featureDescription,
             status: "not-started",
+            repoRoot,
           });
 
           if (outputMode === "human") {
