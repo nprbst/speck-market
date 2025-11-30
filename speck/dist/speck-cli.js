@@ -2223,11 +2223,11 @@ async function detectSpeckRoot() {
       if (dangerousPaths.some((dangerous) => speckRoot === dangerous || speckRoot.startsWith(dangerous + "/"))) {
         throw new Error(`Security: .speck/root symlink points to system directory: ${speckRoot}
 ` + `Speck root must be a user-owned project directory.
-` + "Fix: rm .speck/root && /speck.link <safe-project-path>");
+` + "Fix: rm .speck/root && /speck:link <safe-project-path>");
       }
       if (homeDir && speckRoot === path.dirname(homeDir)) {
         throw new Error(`Security: .speck/root symlink points above home directory: ${speckRoot}
-` + "Fix: rm .speck/root && /speck.link <project-path-within-home>");
+` + "Fix: rm .speck/root && /speck:link <project-path-within-home>");
       }
       await fs.access(speckRoot);
       const config2 = {
@@ -2279,7 +2279,7 @@ async function detectSpeckRoot() {
 ` + `Expected: symlink to speck root directory
 ` + `Found: regular file/directory
 ` + `Falling back to single-repo mode.
-` + "To enable multi-repo: mv .speck/root .speck/root.backup && /speck.link <path>");
+` + "To enable multi-repo: mv .speck/root .speck/root.backup && /speck:link <path>");
     const config2 = {
       mode: "single-repo",
       speckRoot: repoRoot,
@@ -2297,11 +2297,11 @@ async function detectSpeckRoot() {
       if (dangerousPaths.some((dangerous) => speckRoot === dangerous || speckRoot.startsWith(dangerous + "/"))) {
         throw new Error(`Security: .speck/root symlink points to system directory: ${speckRoot}
 ` + `Speck root must be a user-owned project directory.
-` + "Fix: rm .speck/root && /speck.link <safe-project-path>");
+` + "Fix: rm .speck/root && /speck:link <safe-project-path>");
       }
       if (homeDir && speckRoot === path.dirname(homeDir)) {
         throw new Error(`Security: .speck/root symlink points above home directory: ${speckRoot}
-` + "Fix: rm .speck/root && /speck.link <project-path-within-home>");
+` + "Fix: rm .speck/root && /speck:link <project-path-within-home>");
       }
       await fs.access(speckRoot);
       const config2 = {
@@ -2316,14 +2316,14 @@ async function detectSpeckRoot() {
       const err = error;
       if (err.code === "ELOOP") {
         throw new Error(`Multi-repo configuration broken: .speck/root contains circular reference
-` + "Fix: rm .speck/root && /speck.link <valid-path>");
+` + "Fix: rm .speck/root && /speck:link <valid-path>");
       }
       if (err.code === "ENOENT") {
         const target = await fs.readlink(symlinkPath).catch(() => "unknown");
         throw new Error(`Multi-repo configuration broken: .speck/root \u2192 ${target} (does not exist)
 ` + `Fix:
 ` + `  1. Remove broken symlink: rm .speck/root
-` + "  2. Link to correct location: /speck.link <path-to-speck-root>");
+` + "  2. Link to correct location: /speck:link <path-to-speck-root>");
       }
       throw error;
     }
@@ -3064,15 +3064,15 @@ async function main(args) {
     return 0 /* SUCCESS */;
   }
   if (!existsSync2(paths.FEATURE_DIR)) {
-    outputError("FEATURE_DIR_NOT_FOUND", `Feature directory not found: ${paths.FEATURE_DIR}`, ["Run /speck.specify first to create the feature structure."], outputMode, startTime);
+    outputError("FEATURE_DIR_NOT_FOUND", `Feature directory not found: ${paths.FEATURE_DIR}`, ["Run /speck:specify first to create the feature structure."], outputMode, startTime);
     return 1 /* USER_ERROR */;
   }
   if (!options.skipPlanCheck && !existsSync2(paths.IMPL_PLAN)) {
-    outputError("PLAN_NOT_FOUND", `plan.md not found in ${paths.FEATURE_DIR}`, ["Run /speck.plan first to create the implementation plan."], outputMode, startTime);
+    outputError("PLAN_NOT_FOUND", `plan.md not found in ${paths.FEATURE_DIR}`, ["Run /speck:plan first to create the implementation plan."], outputMode, startTime);
     return 1 /* USER_ERROR */;
   }
   if (options.requireTasks && !existsSync2(paths.TASKS)) {
-    outputError("TASKS_NOT_FOUND", `tasks.md not found in ${paths.FEATURE_DIR}`, ["Run /speck.tasks first to create the task list."], outputMode, startTime);
+    outputError("TASKS_NOT_FOUND", `tasks.md not found in ${paths.FEATURE_DIR}`, ["Run /speck:tasks first to create the task list."], outputMode, startTime);
     return 1 /* USER_ERROR */;
   }
   const absoluteDocs = [];
@@ -7351,13 +7351,13 @@ function createHandoffDocument(options) {
 function determineNextStep(status) {
   switch (status) {
     case "not-started":
-      return "Run `/speck.plan` to create an implementation plan, then `/speck.tasks` to generate tasks.";
+      return "Run `/speck:plan` to create an implementation plan, then `/speck:tasks` to generate tasks.";
     case "in-progress":
-      return "Run `/speck.implement` to continue working on the remaining tasks.";
+      return "Run `/speck:implement` to continue working on the remaining tasks.";
     case "completed":
-      return "This feature is complete. Run `/speck.analyze` to verify consistency before merging.";
+      return "This feature is complete. Run `/speck:analyze` to verify consistency before merging.";
     default:
-      return "Start by reviewing the spec, then run `/speck.plan` to create an implementation plan.";
+      return "Start by reviewing the spec, then run `/speck:plan` to create an implementation plan.";
   }
 }
 function generateHandoffMarkdown(doc) {
@@ -7379,8 +7379,8 @@ ${doc.context}
 ## Getting Started
 
 1. **Review the spec**: [\`${doc.specPath}\`](${doc.specPath})
-2. **Check current tasks**: Run \`/speck.tasks\` if tasks.md doesn't exist
-3. **Start implementation**: Run \`/speck.implement\` to execute tasks
+2. **Check current tasks**: Run \`/speck:tasks\` if tasks.md doesn't exist
+3. **Start implementation**: Run \`/speck:implement\` to execute tasks
 
 ## Next Step
 
@@ -9407,6 +9407,8 @@ async function executeLaunchIDECommand(options) {
           skipped: true,
           message: "IDE auto-launch is disabled in configuration"
         }));
+      } else {
+        console.log(`\u26A0 IDE auto-launch is disabled. Run 'speck init' to configure, or launch manually.`);
       }
       return;
     }

@@ -218,13 +218,13 @@ export function createHandoffDocument(options: CreateHandoffOptions): HandoffDoc
 function determineNextStep(status?: HandoffDocument["status"]): string {
   switch (status) {
     case "not-started":
-      return "Run `/speck.plan` to create an implementation plan, then `/speck.tasks` to generate tasks.";
+      return "Run `/speck:plan` to create an implementation plan, then `/speck:tasks` to generate tasks.";
     case "in-progress":
-      return "Run `/speck.implement` to continue working on the remaining tasks.";
+      return "Run `/speck:implement` to continue working on the remaining tasks.";
     case "completed":
-      return "This feature is complete. Run `/speck.analyze` to verify consistency before merging.";
+      return "This feature is complete. Run `/speck:analyze` to verify consistency before merging.";
     default:
-      return "Start by reviewing the spec, then run `/speck.plan` to create an implementation plan.";
+      return "Start by reviewing the spec, then run `/speck:plan` to create an implementation plan.";
   }
 }
 
@@ -259,8 +259,8 @@ ${doc.context}
 ## Getting Started
 
 1. **Review the spec**: [\`${doc.specPath}\`](${doc.specPath})
-2. **Check current tasks**: Run \`/speck.tasks\` if tasks.md doesn't exist
-3. **Start implementation**: Run \`/speck.implement\` to execute tasks
+2. **Check current tasks**: Run \`/speck:tasks\` if tasks.md doesn't exist
+3. **Start implementation**: Run \`/speck:implement\` to execute tasks
 
 ## Next Step
 

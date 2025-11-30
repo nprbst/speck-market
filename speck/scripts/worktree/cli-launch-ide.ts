@@ -39,6 +39,8 @@ export async function executeLaunchIDECommand(
             message: "IDE auto-launch is disabled in configuration",
           })
         );
+      } else {
+        console.log(`⚠ IDE auto-launch is disabled. Run 'speck init' to configure, or launch manually.`);
       }
       return;
     }

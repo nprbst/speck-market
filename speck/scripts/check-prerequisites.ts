@@ -476,7 +476,7 @@ export async function main(args: string[]): Promise<number> {
     outputError(
       "FEATURE_DIR_NOT_FOUND",
       `Feature directory not found: ${paths.FEATURE_DIR}`,
-      ["Run /speck.specify first to create the feature structure."],
+      ["Run /speck:specify first to create the feature structure."],
       outputMode,
       startTime
     );
@@ -488,7 +488,7 @@ export async function main(args: string[]): Promise<number> {
     outputError(
       "PLAN_NOT_FOUND",
       `plan.md not found in ${paths.FEATURE_DIR}`,
-      ["Run /speck.plan first to create the implementation plan."],
+      ["Run /speck:plan first to create the implementation plan."],
       outputMode,
       startTime
     );
@@ -500,7 +500,7 @@ export async function main(args: string[]): Promise<number> {
     outputError(
       "TASKS_NOT_FOUND",
       `tasks.md not found in ${paths.FEATURE_DIR}`,
-      ["Run /speck.tasks first to create the task list."],
+      ["Run /speck:tasks first to create the task list."],
       outputMode,
       startTime
     );

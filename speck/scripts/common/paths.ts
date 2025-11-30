@@ -243,13 +243,13 @@ export async function detectSpeckRoot(): Promise<SpeckConfig> {
         throw new Error(
           `Security: .speck/root symlink points to system directory: ${speckRoot}\n` +
           'Speck root must be a user-owned project directory.\n' +
-          'Fix: rm .speck/root && /speck.link <safe-project-path>'
+          'Fix: rm .speck/root && /speck:link <safe-project-path>'
         );
       }
       if (homeDir && speckRoot === path.dirname(homeDir)) {
         throw new Error(
           `Security: .speck/root symlink points above home directory: ${speckRoot}\n` +
-          'Fix: rm .speck/root && /speck.link <project-path-within-home>'
+          'Fix: rm .speck/root && /speck:link <project-path-within-home>'
         );
       }
 
@@ -325,7 +325,7 @@ export async function detectSpeckRoot(): Promise<SpeckConfig> {
       'Expected: symlink to speck root directory\n' +
       'Found: regular file/directory\n' +
       'Falling back to single-repo mode.\n' +
-      'To enable multi-repo: mv .speck/root .speck/root.backup && /speck.link <path>'
+      'To enable multi-repo: mv .speck/root .speck/root.backup && /speck:link <path>'
     );
     const config: SpeckConfig = {
       mode: 'single-repo',
@@ -351,13 +351,13 @@ export async function detectSpeckRoot(): Promise<SpeckConfig> {
         throw new Error(
           `Security: .speck/root symlink points to system directory: ${speckRoot}\n` +
           'Speck root must be a user-owned project directory.\n' +
-          'Fix: rm .speck/root && /speck.link <safe-project-path>'
+          'Fix: rm .speck/root && /speck:link <safe-project-path>'
         );
       }
       if (homeDir && speckRoot === path.dirname(homeDir)) {
         throw new Error(
           `Security: .speck/root symlink points above home directory: ${speckRoot}\n` +
-          'Fix: rm .speck/root && /speck.link <project-path-within-home>'
+          'Fix: rm .speck/root && /speck:link <project-path-within-home>'
         );
       }
 
@@ -379,7 +379,7 @@ export async function detectSpeckRoot(): Promise<SpeckConfig> {
       if (err.code === 'ELOOP') {
         throw new Error(
           'Multi-repo configuration broken: .speck/root contains circular reference\n' +
-          'Fix: rm .speck/root && /speck.link <valid-path>'
+          'Fix: rm .speck/root && /speck:link <valid-path>'
         );
       }
 
@@ -390,7 +390,7 @@ export async function detectSpeckRoot(): Promise<SpeckConfig> {
           `Multi-repo configuration broken: .speck/root → ${target} (does not exist)\n` +
           'Fix:\n' +
           '  1. Remove broken symlink: rm .speck/root\n' +
-          '  2. Link to correct location: /speck.link <path-to-speck-root>'
+          '  2. Link to correct location: /speck:link <path-to-speck-root>'
         );
       }
 
