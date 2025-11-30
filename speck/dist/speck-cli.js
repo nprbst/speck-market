@@ -8342,6 +8342,7 @@ var exports_env_command = {};
 __export(exports_env_command, {
   main: () => main3
 });
+import { existsSync as existsSync7 } from "fs";
 import fs3 from "fs/promises";
 import path5 from "path";
 async function main3(args = process.argv.slice(2)) {
@@ -8400,6 +8401,46 @@ Description:
   - System diagnostics
   `.trim());
 }
+async function checkLocalSpecsConflict(context) {
+  if (context.mode !== "multi-repo" || context.context !== "child") {
+    return null;
+  }
+  const localSpecsDir = path5.join(context.repoRoot, "specs");
+  if (!existsSync7(localSpecsDir)) {
+    return null;
+  }
+  const conflicts = [];
+  try {
+    const localFeatures = await fs3.readdir(localSpecsDir, { withFileTypes: true });
+    for (const entry of localFeatures) {
+      if (!entry.isDirectory())
+        continue;
+      const featureId = entry.name;
+      const localSpecPath = path5.join(localSpecsDir, featureId, "spec.md");
+      const sharedSpecPath = path5.join(context.specsDir, featureId, "spec.md");
+      if (existsSync7(localSpecPath) && existsSync7(sharedSpecPath)) {
+        conflicts.push(featureId);
+      }
+    }
+  } catch {
+    return null;
+  }
+  if (conflicts.length === 0) {
+    return null;
+  }
+  const conflictList = conflicts.map((f) => `     - ${f}`).join(`
+`);
+  return `\u26A0\uFE0F  WARNING: Conflicting spec.md files found in both local and shared locations
+` + `
+` + `   Features with conflicts:
+` + conflictList + `
+` + `
+` + `   Each feature should have spec.md in only ONE location:
+` + `   - Shared (for cross-repo features): ${context.specsDir}/<feature>/spec.md
+` + `   - Local (for child-only features): ${localSpecsDir}/<feature>/spec.md
+` + `
+` + "   To resolve, remove the duplicate spec.md from one location.";
+}
 async function displayEnvironmentStatus(outputMode, startTime) {
   const config = await detectSpeckRoot();
   const context = await getMultiRepoContext();
@@ -8422,6 +8463,11 @@ async function displayMultiRepoContext(context) {
   try {
     currentBranch = await getCurrentBranch2(context.repoRoot);
   } catch {}
+  const localSpecsWarning = await checkLocalSpecsConflict(context);
+  if (localSpecsWarning) {
+    console.log(localSpecsWarning);
+    console.log("");
+  }
   if (context.mode === "single-repo") {
     console.log("Mode: Single-repo");
     console.log(`  Repo Root: ${context.repoRoot}`);
@@ -8594,7 +8640,7 @@ var exports_init = {};
 __export(exports_init, {
   main: () => main4
 });
-import { existsSync as existsSync7, mkdirSync as mkdirSync3, lstatSync, readlinkSync, unlinkSync, symlinkSync as symlinkSync2, readFileSync as readFileSync3, writeFileSync as writeFileSync2 } from "fs";
+import { existsSync as existsSync8, mkdirSync as mkdirSync3, lstatSync, readlinkSync, unlinkSync, symlinkSync as symlinkSync2, readFileSync as readFileSync3, writeFileSync as writeFileSync2 } from "fs";
 import { join as join4, dirname as dirname2, resolve as resolve2 } from "path";
 import { homedir } from "os";
 import { parseArgs as parseArgs3 } from "util";
@@ -8615,10 +8661,10 @@ function findGitRoot() {
 function createSpeckDirectory(repoRoot) {
   const speckDir = join4(repoRoot, ".speck");
   try {
-    const alreadyExists = existsSync7(speckDir);
+    const alreadyExists = existsSync8(speckDir);
     for (const subdir of SPECK_SUBDIRS) {
       const subdirPath = join4(speckDir, subdir);
-      if (!existsSync7(subdirPath)) {
+      if (!existsSync8(subdirPath)) {
         mkdirSync3(subdirPath, { recursive: true });
       }
     }
@@ -8636,7 +8682,7 @@ function getBootstrapPath() {
     resolve2(scriptDir, "../../src/cli/bootstrap.sh")
   ];
   for (const candidate of candidates) {
-    if (existsSync7(candidate)) {
+    if (existsSync8(candidate)) {
       return candidate;
     }
   }
@@ -8660,7 +8706,7 @@ Then reload your shell config:
 }
 function isValidSymlink(symlinkPath, expectedTarget) {
   try {
-    if (!existsSync7(symlinkPath))
+    if (!existsSync8(symlinkPath))
       return false;
     if (!lstatSync(symlinkPath).isSymbolicLink())
       return false;
@@ -8672,7 +8718,7 @@ function isValidSymlink(symlinkPath, expectedTarget) {
 }
 function isRegularFile(path6) {
   try {
-    return existsSync7(path6) && lstatSync(path6).isFile() && !lstatSync(path6).isSymbolicLink();
+    return existsSync8(path6) && lstatSync(path6).isFile() && !lstatSync(path6).isSymbolicLink();
   } catch {
     return false;
   }
@@ -8715,7 +8761,7 @@ async function promptIDE(defaultEditor) {
 }
 async function createSpeckConfig(speckDir, isInteractive, options) {
   const configPath = join4(speckDir, "config.json");
-  if (existsSync7(configPath)) {
+  if (existsSync8(configPath)) {
     return false;
   }
   const config = JSON.parse(JSON.stringify(DEFAULT_SPECK_CONFIG));
@@ -8753,11 +8799,11 @@ function configurePluginPermissions(repoRoot) {
   const settingsPath = join4(repoRoot, ".claude", "settings.local.json");
   try {
     const claudeDir = join4(repoRoot, ".claude");
-    if (!existsSync7(claudeDir)) {
+    if (!existsSync8(claudeDir)) {
       mkdirSync3(claudeDir, { recursive: true });
     }
     let settings = {};
-    if (existsSync7(settingsPath)) {
+    if (existsSync8(settingsPath)) {
       const content = readFileSync3(settingsPath, "utf-8");
       settings = JSON.parse(content);
     }
@@ -8813,12 +8859,12 @@ Then run 'speck init' again.`,
     speckDirCreated = speckResult.created;
     speckDirPath = speckResult.path;
     const constitutionPath = join4(speckResult.path, "memory", "constitution.md");
-    needsConstitution = !existsSync7(constitutionPath);
+    needsConstitution = !existsSync8(constitutionPath);
     const isInteractive = !options.json && process.stdin.isTTY;
     configCreated = await createSpeckConfig(speckResult.path, isInteractive, options);
   }
   const permissionsConfigured = configurePluginPermissions(gitRoot);
-  if (!existsSync7(bootstrapPath)) {
+  if (!existsSync8(bootstrapPath)) {
     return {
       success: false,
       symlinkPath: SYMLINK_PATH,
@@ -8861,7 +8907,7 @@ Then run 'speck init' again.`,
     }
     unlinkSync(SYMLINK_PATH);
   }
-  if (existsSync7(SYMLINK_PATH)) {
+  if (existsSync8(SYMLINK_PATH)) {
     if (isRegularFile(SYMLINK_PATH)) {
       if (!options.force) {
         return {
@@ -8878,7 +8924,7 @@ Then run 'speck init' again.`,
     }
     unlinkSync(SYMLINK_PATH);
   }
-  if (!existsSync7(LOCAL_BIN_DIR)) {
+  if (!existsSync8(LOCAL_BIN_DIR)) {
     mkdirSync3(LOCAL_BIN_DIR, { recursive: true });
   }
   try {
@@ -9068,7 +9114,7 @@ var exports_setup_plan = {};
 __export(exports_setup_plan, {
   main: () => main5
 });
-import { existsSync as existsSync8, mkdirSync as mkdirSync4, copyFileSync as copyFileSync2 } from "fs";
+import { existsSync as existsSync9, mkdirSync as mkdirSync4, copyFileSync as copyFileSync2 } from "fs";
 import path6 from "path";
 var {$: $5 } = globalThis.Bun;
 function parseArgs4(args) {
@@ -9113,7 +9159,7 @@ async function main5(args) {
       console.error(`[specify] Warning: Could not manage git branch: ${String(error)}`);
     }
     const specFile = paths.FEATURE_SPEC;
-    const isSharedSpec = config.mode === "multi-repo" && existsSync8(specFile);
+    const isSharedSpec = config.mode === "multi-repo" && existsSync9(specFile);
     if (isSharedSpec) {
       const parentRepoRoot = config.speckRoot;
       let parentHasGit = false;
@@ -9142,7 +9188,7 @@ async function main5(args) {
     }
   }
   const template = path6.join(getTemplatesDir(), "plan-template.md");
-  if (existsSync8(template)) {
+  if (existsSync9(template)) {
     const implPlanDir = path6.dirname(paths.IMPL_PLAN);
     mkdirSync4(implPlanDir, { recursive: true });
     copyFileSync2(template, paths.IMPL_PLAN);
@@ -9180,7 +9226,7 @@ var exports_update_agent_context = {};
 __export(exports_update_agent_context, {
   main: () => main6
 });
-import { existsSync as existsSync9, readFileSync as readFileSync4, writeFileSync as writeFileSync3 } from "fs";
+import { existsSync as existsSync10, readFileSync as readFileSync4, writeFileSync as writeFileSync3 } from "fs";
 import path7 from "path";
 function extractPlanField(fieldPattern, planContent) {
   const regex = new RegExp(`^\\*\\*${fieldPattern}\\*\\*: (.+)$`, "m");
@@ -9194,7 +9240,7 @@ function extractPlanField(fieldPattern, planContent) {
   return value;
 }
 function parsePlanData(planFile) {
-  if (!existsSync9(planFile)) {
+  if (!existsSync10(planFile)) {
     console.error(`ERROR: Plan file not found: ${planFile}`);
     process.exit(1 /* USER_ERROR */);
   }
@@ -9252,7 +9298,7 @@ function getLanguageConventions(lang) {
   return `${lang ?? "Unknown"}: Follow standard conventions`;
 }
 function createNewClaudeFile(targetFile, templateFile, projectName, currentDate, currentBranch, lang, framework, projectType) {
-  if (!existsSync9(templateFile)) {
+  if (!existsSync10(templateFile)) {
     console.error(`ERROR: Template not found at ${templateFile}`);
     process.exit(1 /* USER_ERROR */);
   }
@@ -9368,7 +9414,7 @@ function updateClaudeFile(repoRoot, currentBranch, lang, framework, db, projectT
   const projectName = path7.basename(repoRoot);
   const currentDate = new Date().toISOString().split("T")[0];
   const templateFile = path7.join(getTemplatesDir(), "agent-file-template.md");
-  if (!existsSync9(targetFile)) {
+  if (!existsSync10(targetFile)) {
     createNewClaudeFile(targetFile, templateFile, projectName, currentDate, currentBranch, lang, framework, projectType);
   } else {
     updateExistingClaudeFile(targetFile, currentDate, currentBranch, lang, framework, db);
@@ -9398,7 +9444,7 @@ async function main6(_args) {
     }
     return 1 /* USER_ERROR */;
   }
-  if (!existsSync9(paths.IMPL_PLAN)) {
+  if (!existsSync10(paths.IMPL_PLAN)) {
     console.error(`ERROR: No plan.md found at ${paths.IMPL_PLAN}`);
     console.log("INFO: Make sure you're working on a feature with a corresponding spec directory");
     if (paths.HAS_GIT !== "true") {
@@ -9437,7 +9483,7 @@ var {
 } = import__.default;
 
 // src/cli/index.ts
-import { readFileSync as readFileSync5, existsSync as existsSync10 } from "fs";
+import { readFileSync as readFileSync5, existsSync as existsSync11 } from "fs";
 import { join as join5, dirname as dirname3 } from "path";
 var lazyCheckPrerequisites = () => init_check_prerequisites().then(() => exports_check_prerequisites);
 var lazyCreateNewFeature = () => init_create_new_feature().then(() => exports_create_new_feature);
@@ -9457,7 +9503,7 @@ function getVersion() {
       join5(process.cwd(), "package.json")
     ];
     for (const pkgPath of possiblePaths) {
-      if (existsSync10(pkgPath)) {
+      if (existsSync11(pkgPath)) {
         const pkg = JSON.parse(readFileSync5(pkgPath, "utf-8"));
         if (pkg.version) {
           return pkg.version;
