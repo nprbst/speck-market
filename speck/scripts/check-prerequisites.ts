@@ -32,6 +32,7 @@ import { join, basename, relative } from "node:path";
 import {
   getFeaturePaths,
   checkFeatureBranch,
+  getTemplatesDir,
   type FeaturePaths,
 } from "./common/paths";
 import { ExitCode } from "./contracts/cli-interface";
@@ -87,6 +88,8 @@ export interface ValidationOutput {
   IMPL_PLAN?: string;
   TASKS?: string;
   REPO_ROOT?: string;
+  // Template directory for loading spec/plan/tasks templates
+  TEMPLATE_DIR?: string;
 }
 
 /**
@@ -606,6 +609,9 @@ export async function main(args: string[]): Promise<number> {
     }
   }
 
+  // Get templates directory (works in both dev and plugin contexts)
+  const templateDir = getTemplatesDir();
+
   // Build the validation result data
   const validationData: ValidationOutput = {
     MODE: paths.MODE,
@@ -617,6 +623,8 @@ export async function main(args: string[]): Promise<number> {
     IMPL_PLAN: paths.IMPL_PLAN,
     TASKS: paths.TASKS,
     REPO_ROOT: paths.REPO_ROOT,
+    // Include template directory for loading templates
+    TEMPLATE_DIR: templateDir,
   };
 
   // Output results based on mode
@@ -664,6 +672,7 @@ function buildHookContext(data: ValidationOutput): string {
       IMPL_PLAN: data.IMPL_PLAN,
       TASKS: data.TASKS,
       REPO_ROOT: data.REPO_ROOT,
+      TEMPLATE_DIR: data.TEMPLATE_DIR,
     }),
     "-->",
   ];

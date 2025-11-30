@@ -29,7 +29,7 @@ Parse command-line flags from user input:
 1. **Setup**: Extract prerequisite context from the auto-injected comment in the prompt:
    ```
    <!-- SPECK_PREREQ_CONTEXT
-   {"MODE":"multi-repo","FEATURE_DIR":"/path/to/root-repo/specs/010-feature","IMPL_PLAN":"/path/to/child-repo/specs/010-feature/plan.md","TASKS":"/path/to/child-repo/specs/010-feature/tasks.md","REPO_ROOT":"/path/to/child-repo","AVAILABLE_DOCS":["../../../8-specs/specs/010-feature/spec.md",".speck/memory/constitution.md"]}
+   {"MODE":"multi-repo","FEATURE_DIR":"/path/to/root-repo/specs/010-feature","IMPL_PLAN":"/path/to/child-repo/specs/010-feature/plan.md","TASKS":"/path/to/child-repo/specs/010-feature/tasks.md","REPO_ROOT":"/path/to/child-repo","TEMPLATE_DIR":"/path/to/plugin/templates","AVAILABLE_DOCS":["../../../8-specs/specs/010-feature/spec.md",".speck/memory/constitution.md"]}
    -->
    ```
 
@@ -38,6 +38,7 @@ Parse command-line flags from user input:
    - `IMPL_PLAN`: Full path where plan.md should be written - **WRITE HERE**
    - `TASKS`: Full path where tasks.md should be written (used by /speck:tasks)
    - `REPO_ROOT`: Root directory of current repository (for relative path calculations)
+   - `TEMPLATE_DIR`: Directory containing templates (plan-template.md, spec-template.md, etc.) - **USE FOR TEMPLATES**
    - `MODE`: "single-repo" or "multi-repo" (child in multi-repo setup)
 
    **Multi-repo behavior**:
@@ -58,7 +59,7 @@ Parse command-line flags from user input:
 
 2. **Load context**:
    - Read spec.md and constitution.md from paths in AVAILABLE_DOCS using Read tool
-   - Load plan.md template (always use Read - not pre-loaded)
+   - Load plan template from `{TEMPLATE_DIR}/plan-template.md` using Read tool
 
 3. **Execute plan workflow**: Follow the structure in IMPL_PLAN template to:
    - Fill Technical Context (mark unknowns as "NEEDS CLARIFICATION")

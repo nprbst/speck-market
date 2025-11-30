@@ -28,6 +28,35 @@ import { readdirSync } from "fs";
 import fs from "fs/promises";
 import path from "path";
 var {$ } = globalThis.Bun;
+function isPluginInstallation() {
+  if (process.env.CLAUDE_PLUGIN_ROOT) {
+    return true;
+  }
+  const scriptDir = import.meta.dir;
+  return scriptDir.includes("/.claude/plugins/") || scriptDir.includes("/.config/claude-code/plugins/");
+}
+function getPluginRoot() {
+  if (process.env.CLAUDE_PLUGIN_ROOT) {
+    return process.env.CLAUDE_PLUGIN_ROOT;
+  }
+  const scriptDir = import.meta.dir;
+  if (scriptDir.endsWith("/dist") || scriptDir.includes("/dist/")) {
+    return path.resolve(scriptDir, "..");
+  }
+  if (isPluginInstallation()) {
+    return path.resolve(scriptDir, "../../..");
+  } else {
+    return path.resolve(scriptDir, "../../..");
+  }
+}
+function getTemplatesDir() {
+  const pluginRoot = getPluginRoot();
+  if (isPluginInstallation()) {
+    return path.join(pluginRoot, "templates");
+  } else {
+    return path.join(pluginRoot, ".speck/templates");
+  }
+}
 async function getRepoRoot() {
   try {
     const result = await $`git rev-parse --show-toplevel`.quiet();
@@ -762,6 +791,7 @@ async function main(args) {
 `);
     }
   }
+  const templateDir = getTemplatesDir();
   const validationData = {
     MODE: paths.MODE,
     FEATURE_DIR: paths.FEATURE_DIR,
@@ -770,7 +800,8 @@ async function main(args) {
     ...workflowMode && { WORKFLOW_MODE: workflowMode },
     IMPL_PLAN: paths.IMPL_PLAN,
     TASKS: paths.TASKS,
-    REPO_ROOT: paths.REPO_ROOT
+    REPO_ROOT: paths.REPO_ROOT,
+    TEMPLATE_DIR: templateDir
   };
   if (outputMode === "json") {
     const output = formatJsonOutput({
@@ -806,7 +837,8 @@ function buildHookContext(data) {
       WORKFLOW_MODE: data.WORKFLOW_MODE,
       IMPL_PLAN: data.IMPL_PLAN,
       TASKS: data.TASKS,
-      REPO_ROOT: data.REPO_ROOT
+      REPO_ROOT: data.REPO_ROOT,
+      TEMPLATE_DIR: data.TEMPLATE_DIR
     }),
     "-->"
   ];

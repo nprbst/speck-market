@@ -44,7 +44,7 @@ This command supports the following flags for branch-aware task generation (US4)
 2. **Setup**: Extract prerequisite context from the auto-injected comment in the prompt:
    ```
    <!-- SPECK_PREREQ_CONTEXT
-   {"MODE":"multi-repo","FEATURE_DIR":"/path/to/root-repo/specs/010-feature","IMPL_PLAN":"/path/to/child-repo/specs/010-feature/plan.md","TASKS":"/path/to/child-repo/specs/010-feature/tasks.md","REPO_ROOT":"/path/to/child-repo","AVAILABLE_DOCS":["../../../8-specs/specs/010-feature/spec.md","specs/010-feature/plan.md","specs/010-feature/research.md"]}
+   {"MODE":"multi-repo","FEATURE_DIR":"/path/to/root-repo/specs/010-feature","IMPL_PLAN":"/path/to/child-repo/specs/010-feature/plan.md","TASKS":"/path/to/child-repo/specs/010-feature/tasks.md","REPO_ROOT":"/path/to/child-repo","TEMPLATE_DIR":"/path/to/plugin/templates","AVAILABLE_DOCS":["../../../8-specs/specs/010-feature/spec.md","specs/010-feature/plan.md","specs/010-feature/research.md"]}
    -->
    ```
 
@@ -53,6 +53,7 @@ This command supports the following flags for branch-aware task generation (US4)
    - `IMPL_PLAN`: Full path to plan.md (for reading in multi-repo mode)
    - `TASKS`: Full path where tasks.md should be written - **WRITE HERE**
    - `REPO_ROOT`: Root directory of current repository (for relative path calculations)
+   - `TEMPLATE_DIR`: Directory containing templates (tasks-template.md, spec-template.md, etc.) - **USE FOR TEMPLATES**
    - `MODE`: "single-repo" or "multi-repo" (child in multi-repo setup)
 
    **Multi-repo behavior**:
@@ -101,7 +102,7 @@ This command supports the following flags for branch-aware task generation (US4)
    - Create parallel execution examples per user story
    - Validate task completeness (each user story has all needed tasks, independently testable)
 
-5. **Generate tasks.md** (T058): Use `${CLAUDE_PLUGIN_ROOT}/templates/tasks-template.md` as structure, fill with:
+5. **Generate tasks.md** (T058): Load tasks template from `{TEMPLATE_DIR}/tasks-template.md` as structure, fill with:
    - **Output file path**:
      - **IMPORTANT**: Use TASKS path from prerequisite context, NOT FEATURE_DIR
      - If `--branch` flag provided: Replace `.md` extension in TASKS path with `-<branch-name>.md`

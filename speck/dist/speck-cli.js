@@ -3134,6 +3134,7 @@ async function main(args) {
 `);
     }
   }
+  const templateDir = getTemplatesDir();
   const validationData = {
     MODE: paths.MODE,
     FEATURE_DIR: paths.FEATURE_DIR,
@@ -3142,7 +3143,8 @@ async function main(args) {
     ...workflowMode && { WORKFLOW_MODE: workflowMode },
     IMPL_PLAN: paths.IMPL_PLAN,
     TASKS: paths.TASKS,
-    REPO_ROOT: paths.REPO_ROOT
+    REPO_ROOT: paths.REPO_ROOT,
+    TEMPLATE_DIR: templateDir
   };
   if (outputMode === "json") {
     const output = formatJsonOutput({
@@ -3178,7 +3180,8 @@ function buildHookContext(data) {
       WORKFLOW_MODE: data.WORKFLOW_MODE,
       IMPL_PLAN: data.IMPL_PLAN,
       TASKS: data.TASKS,
-      REPO_ROOT: data.REPO_ROOT
+      REPO_ROOT: data.REPO_ROOT,
+      TEMPLATE_DIR: data.TEMPLATE_DIR
     }),
     "-->"
   ];

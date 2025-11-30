@@ -36,10 +36,10 @@ You **MUST** consider the user input before proceeding (if not empty).
 1. **Setup**: Extract prerequisite context from the auto-injected comment in the prompt:
    ```
    <!-- SPECK_PREREQ_CONTEXT
-   {"MODE":"single-repo","FEATURE_DIR":"/path/to/specs/010-feature","AVAILABLE_DOCS":["specs/010-feature/spec.md","specs/010-feature/plan.md","specs/010-feature/tasks.md"]}
+   {"MODE":"single-repo","FEATURE_DIR":"/path/to/specs/010-feature","TEMPLATE_DIR":"/path/to/plugin/templates","AVAILABLE_DOCS":["specs/010-feature/spec.md","specs/010-feature/plan.md","specs/010-feature/tasks.md"]}
    -->
    ```
-   Use the FEATURE_DIR and AVAILABLE_DOCS values from this JSON.
+   Use the FEATURE_DIR, TEMPLATE_DIR, and AVAILABLE_DOCS values from this JSON.
 
    **Fallback**: If the comment is not present (VSCode hook bug), run:
    ```bash
@@ -219,7 +219,7 @@ You **MUST** consider the user input before proceeding (if not empty).
    - ✅ "Are [edge cases/scenarios] addressed in requirements?"
    - ✅ "Does the spec define [missing aspect]?"
 
-6. **Structure Reference**: Generate the checklist following the canonical template in `${CLAUDE_PLUGIN_ROOT}/templates/checklist-template.md` for title, meta section, category headings, and ID formatting. If template is unavailable, use: H1 title, purpose/created meta lines, `##` category sections containing `- [ ] CHK### <requirement item>` lines with globally incrementing IDs starting at CHK001.
+6. **Structure Reference**: Generate the checklist following the canonical template in `{TEMPLATE_DIR}/checklist-template.md` for title, meta section, category headings, and ID formatting. If template is unavailable, use: H1 title, purpose/created meta lines, `##` category sections containing `- [ ] CHK### <requirement item>` lines with globally incrementing IDs starting at CHK001.
 
 7. **Report**: Output full path to created checklist, item count, and remind user that each run creates a new file. Summarize:
    - Focus areas selected
