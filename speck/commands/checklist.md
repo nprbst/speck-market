@@ -46,11 +46,7 @@ You **MUST** consider the user input before proceeding (if not empty).
    speck check-prerequisites --json
    ```
 
-   **Fallback (VSCode hook bug)**: If the virtual command fails with exit code 127, run:
-   ```bash
-   bun ~/.claude/plugins/marketplaces/speck-market/speck/scripts/check-prerequisites.ts --json
-   ```
-   Then manually parse the JSON output to extract FEATURE_DIR and AVAILABLE_DOCS.
+   Then parse the JSON output to extract FEATURE_DIR and AVAILABLE_DOCS.
 
 2. **Clarify intent (dynamic)**: Derive up to THREE initial contextual clarifying questions (no pre-baked catalog). They MUST:
    - Be generated from the user's phrasing + extracted signals from spec/plan/tasks

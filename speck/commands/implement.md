@@ -10,35 +10,22 @@ $ARGUMENTS
 
 You **MUST** consider the user input before proceeding (if not empty).
 
-## Workflow Mode Detection
-
-Parse command-line flags from user input:
-- `--stacked`: Enable stacked PR workflow (prompt for branch creation at user story boundaries)
-- `--single-branch`: Explicitly disable stacked PR workflow (suppress all stacking prompts)
-- If no flag provided: Read workflow mode from plan.md or constitution (see step 3a)
-
 ## Outline
 
 1. Extract prerequisite context from the auto-injected comment in the prompt:
    ```
    <!-- SPECK_PREREQ_CONTEXT
-   {"MODE":"single-repo","FEATURE_DIR":"/path/to/specs/010-feature","AVAILABLE_DOCS":["specs/010-feature/research.md","specs/010-feature/tasks.md","specs/010-feature/plan.md",".speck/memory/constitution.md","../../../8-specs/specs/010-feature/checklists/requirements.md"],"WORKFLOW_MODE":"single-branch"}
+   {"MODE":"single-repo","FEATURE_DIR":"/path/to/specs/010-feature","AVAILABLE_DOCS":["specs/010-feature/research.md","specs/010-feature/tasks.md","specs/010-feature/plan.md",".speck/memory/constitution.md","../../../8-specs/specs/010-feature/checklists/requirements.md"]}
    -->
    ```
-   Use the FEATURE_DIR, AVAILABLE_DOCS, and WORKFLOW_MODE values from this JSON.
-
-   **WORKFLOW_MODE field**: Pre-determined workflow mode (`"stacked-pr"` or `"single-branch"`) from plan.md → constitution.md → default.
+   Use the FEATURE_DIR and AVAILABLE_DOCS values from this JSON.
 
    **Fallback**: If the comment is not present (VSCode hook bug), run:
    ```bash
    speck check-prerequisites --json --require-tasks --include-tasks
    ```
 
-   **Fallback (VSCode hook bug)**: If the virtual command fails with exit code 127, run:
-   ```bash
-   bun ~/.claude/plugins/marketplaces/speck-market/speck/scripts/check-prerequisites.ts --json --require-tasks --include-tasks
-   ```
-   Then manually parse the JSON output to extract MODE, FEATURE_DIR, AVAILABLE_DOCS, and WORKFLOW_MODE.
+   Then parse the JSON output to extract MODE, FEATURE_DIR, and AVAILABLE_DOCS.
 
 2. **Check checklists status** (if checklists exist):
    - Find checklist files from AVAILABLE_DOCS (paths containing "/checklists/")
@@ -85,21 +72,6 @@ Parse command-line flags from user input:
    - contracts/ files
    - research.md
    - quickstart.md
-
-3a. **Determine Workflow Mode** (for stacked PR automation):
-   - Check command-line flags first (highest priority):
-     - If `--stacked` in user input → `workflowMode = "stacked-pr"`
-     - If `--single-branch` in user input → `workflowMode = "single-branch"`
-   - If no flag provided, check WORKFLOW_MODE from prerequisite context (step 1):
-     - If WORKFLOW_MODE field is present → use that value
-     - If WORKFLOW_MODE field is not present, read from plan.md:
-       - Search for line matching: `**Workflow Mode**: stacked-pr` or `**Workflow Mode**: single-branch`
-       - If found → use that value
-     - If not in plan.md, read from constitution (.speck/memory/constitution.md):
-       - Search for line matching: `**Default Workflow Mode**: stacked-pr` or `**Default Workflow Mode**: single-branch`
-       - If found → use that value
-     - If not found anywhere → default to `"single-branch"`
-   - Store the determined workflow mode for use in step 8a
 
 4. **Project Setup Verification**:
    - **REQUIRED**: Create/verify ignore files based on actual project setup:
@@ -172,83 +144,6 @@ Parse command-line flags from user input:
    - Provide clear error messages with context for debugging
    - Suggest next steps if implementation cannot proceed
    - **IMPORTANT** For completed tasks, make sure to mark the task off as [X] in the tasks file.
-
-8a. **Stacked PR Automation** (only if workflowMode = "stacked-pr"):
-   - **Initialize session state**:
-     - `stackingEnabled = true` (can be disabled by user choosing "skip" option)
-     - `completedUserStories = []` (track which user stories have been completed)
-
-   - **After completing each user story phase** in tasks.md:
-     - Detect user story boundary by checking tasks.md structure (e.g., "## Phase 3: User Story 1")
-     - Verify user story is complete by checking:
-       - All tasks in that phase are marked [X]
-       - All acceptance scenarios from spec.md are met (if testable)
-
-   - **At each detected boundary** (if stackingEnabled = true):
-     - Get current git branch: `git rev-parse --abbrev-ref HEAD`
-     - Check for uncommitted changes: `git status --porcelain`
-     - If uncommitted changes exist:
-       - Display warning: "You have uncommitted work. Please commit or stash before creating a stacked branch."
-       - Skip stacking prompt for this boundary
-       - Continue with implementation
-
-     - If no uncommitted changes:
-       - Display completion message: "✓ {User Story ID} complete. All acceptance scenarios passed."
-       - **Prompt user**: "Create stacked branch for next work? (yes/no/skip)"
-       - **Wait for user response**
-
-       - **If user says "yes"** or "y" or "proceed":
-         - Collect metadata interactively:
-           - Prompt: "Branch name for next work? (e.g., username/feature-name)"
-           - Read branch name from user
-           - Validate branch name using `git check-ref-format --branch <name>`
-           - If invalid, show error and re-prompt
-           - Prompt: "PR title? (leave blank to auto-generate from commits)"
-           - Read PR title (optional)
-           - Prompt: "PR description? (leave blank to auto-generate from commits)"
-           - Read PR description (optional)
-
-         - Use current branch as base for new stacked branch
-         - Create PR for current branch:
-           - Check if `gh` CLI is available: `which gh` or `gh --version`
-           - If `gh` available:
-             - Determine PR base from .speck/branches.json (parent's PR base) or default to "main"
-             - If PR title/description not provided by user:
-               - Get commits on current branch: `git log <pr-base>..<current> --format="%s%n%b"`
-               - Analyze commits to generate title/description (first substantive commit subject as title, bulleted list of commits as description)
-             - Run: `gh pr create --title "<title>" --body "<description>" --base <pr-base>`
-             - Parse PR number from output (look for "https://github.com/.../pull/###")
-             - If successful:
-               - Update .speck/branches.json with PR number and status="submitted"
-               - Display: "✓ Created PR #{number}: {title}"
-             - If failed (network error, not authenticated, etc.):
-               - Display error message with gh CLI output
-               - Suggest: "Install gh CLI or run with --skip-pr-prompt"
-               - Continue with branch creation (skip PR step)
-
-           - If `gh` not available:
-             - Display: "GitHub CLI (gh) not found. Install it to create PRs automatically."
-             - Generate PR URL manually: `https://github.com/{owner}/{repo}/compare/{base}...{current}`
-             - Display: "Create PR manually: {URL}"
-             - Suggest: "Or install gh CLI: https://cli.github.com/"
-
-         - Create new stacked branch:
-           - Run `/speck:branch create <new-branch-name> --base <current-branch> --skip-pr-prompt`
-           - If creation fails, display error and halt stacking (do not proceed to next user story)
-           - If successful, switch to new branch and continue with next user story
-
-         - Add completed user story to completedUserStories list
-
-       - **If user says "no"** or "n":
-         - Display: "Continuing implementation on current branch without creating new branch."
-         - Continue with next user story phase on same branch
-         - Add completed user story to completedUserStories list
-
-       - **If user says "skip"** or "s":
-         - Set `stackingEnabled = false` (suppress all future stacking prompts for this session)
-         - Display: "Stacking prompts suppressed for this session. Use /speck:branch create manually if needed."
-         - Continue with next user story phase on same branch
-         - Add completed user story to completedUserStories list
 
 9. Completion validation:
    - Verify all required tasks are completed

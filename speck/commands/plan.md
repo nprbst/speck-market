@@ -51,11 +51,7 @@ Parse command-line flags from user input:
    ```
    Parse JSON for FEATURE_SPEC, IMPL_PLAN, SPECS_DIR, BRANCH.
 
-   **Fallback (VSCode hook bug)**: If the virtual command fails with exit code 127, run:
-   ```bash
-   bun ~/.claude/plugins/marketplaces/speck-market/speck/scripts/setup-plan.ts --json
-   ```
-   Then manually parse the JSON output to extract FEATURE_SPEC, IMPL_PLAN, SPECS_DIR, and BRANCH.
+   Then parse the JSON output to extract FEATURE_SPEC, IMPL_PLAN, SPECS_DIR, and BRANCH.
 
 2. **Load context** (use Read tool for all files):
    - **Read** spec.md and constitution.md from paths in AVAILABLE_DOCS

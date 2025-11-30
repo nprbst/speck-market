@@ -37,11 +37,7 @@ Use FEATURE_DIR and AVAILABLE_DOCS from this JSON.
 speck check-prerequisites --json --require-tasks --include-tasks
 ```
 
-**Fallback (VSCode hook bug)**: If the virtual command fails with exit code 127, run:
-```bash
-bun ~/.claude/plugins/marketplaces/speck-market/speck/scripts/check-prerequisites.ts --json --require-tasks --include-tasks
-```
-Then manually parse the JSON output to extract FEATURE_DIR and AVAILABLE_DOCS.
+Then parse the JSON output to extract FEATURE_DIR and AVAILABLE_DOCS.
 
 Abort with an error message if any required file is missing (instruct the user to run missing prerequisite command).
 
