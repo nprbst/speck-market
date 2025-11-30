@@ -226,6 +226,54 @@ export async function detectSpeckRoot(): Promise<SpeckConfig> {
     return cachedConfig;
   }
 
+  // Check CWD first for .speck/root - needed for monorepo packages
+  // In a monorepo, packages share the same git root but have their own .speck/ directories
+  const cwd = process.cwd();
+  const cwdSymlinkPath = path.join(cwd, '.speck', 'root');
+  try {
+    const cwdStats = await fs.lstat(cwdSymlinkPath);
+    if (cwdStats.isSymbolicLink()) {
+      // CWD has .speck/root symlink - this is a monorepo package or multi-repo child
+      const speckRoot = await fs.realpath(cwdSymlinkPath);
+
+      // Security: Validate symlink target doesn't escape to sensitive paths
+      const dangerousPaths = ['/', '/etc', '/usr', '/bin', '/sbin', '/System', '/Library'];
+      const homeDir = process.env.HOME || process.env.USERPROFILE || '';
+      if (dangerousPaths.some(dangerous => speckRoot === dangerous || speckRoot.startsWith(dangerous + '/'))) {
+        throw new Error(
+          `Security: .speck/root symlink points to system directory: ${speckRoot}\n` +
+          'Speck root must be a user-owned project directory.\n' +
+          'Fix: rm .speck/root && /speck.link <safe-project-path>'
+        );
+      }
+      if (homeDir && speckRoot === path.dirname(homeDir)) {
+        throw new Error(
+          `Security: .speck/root symlink points above home directory: ${speckRoot}\n` +
+          'Fix: rm .speck/root && /speck.link <project-path-within-home>'
+        );
+      }
+
+      // Verify target exists
+      await fs.access(speckRoot);
+
+      const config: SpeckConfig = {
+        mode: 'multi-repo',
+        speckRoot,
+        repoRoot: cwd,  // Use CWD as repoRoot for local artifacts
+        specsDir: path.join(speckRoot, 'specs')
+      };
+      cachedConfig = config;
+      return config;
+    }
+  } catch (error) {
+    const err = error as NodeJS.ErrnoException;
+    // Only ignore ENOENT (file not found) - rethrow security/other errors
+    if (err.code !== 'ENOENT' && err.message?.includes('Security:')) {
+      throw error;
+    }
+    // No .speck/root at CWD, continue to git root check
+  }
+
   const repoRoot = await getRepoRoot();
 
   // T120: Handle worktree case - check main worktree's .speck/root symlink

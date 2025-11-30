@@ -41,6 +41,39 @@ async function detectSpeckRoot() {
   if (cachedConfig) {
     return cachedConfig;
   }
+  const cwd = process.cwd();
+  const cwdSymlinkPath = path.join(cwd, ".speck", "root");
+  try {
+    const cwdStats = await fs.lstat(cwdSymlinkPath);
+    if (cwdStats.isSymbolicLink()) {
+      const speckRoot = await fs.realpath(cwdSymlinkPath);
+      const dangerousPaths = ["/", "/etc", "/usr", "/bin", "/sbin", "/System", "/Library"];
+      const homeDir = process.env.HOME || process.env.USERPROFILE || "";
+      if (dangerousPaths.some((dangerous) => speckRoot === dangerous || speckRoot.startsWith(dangerous + "/"))) {
+        throw new Error(`Security: .speck/root symlink points to system directory: ${speckRoot}
+` + `Speck root must be a user-owned project directory.
+` + "Fix: rm .speck/root && /speck.link <safe-project-path>");
+      }
+      if (homeDir && speckRoot === path.dirname(homeDir)) {
+        throw new Error(`Security: .speck/root symlink points above home directory: ${speckRoot}
+` + "Fix: rm .speck/root && /speck.link <project-path-within-home>");
+      }
+      await fs.access(speckRoot);
+      const config2 = {
+        mode: "multi-repo",
+        speckRoot,
+        repoRoot: cwd,
+        specsDir: path.join(speckRoot, "specs")
+      };
+      cachedConfig = config2;
+      return config2;
+    }
+  } catch (error) {
+    const err = error;
+    if (err.code !== "ENOENT" && err.message?.includes("Security:")) {
+      throw error;
+    }
+  }
   const repoRoot = await getRepoRoot();
   let mainRepoRoot = repoRoot;
   const gitPath = path.join(repoRoot, ".git");
