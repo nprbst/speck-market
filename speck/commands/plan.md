@@ -51,7 +51,9 @@ Parse command-line flags from user input:
    ```
    Parse JSON for FEATURE_SPEC, IMPL_PLAN, SPECS_DIR, BRANCH.
 
-   Then parse the JSON output to extract FEATURE_SPEC, IMPL_PLAN, SPECS_DIR, and BRANCH.
+   **IMPORTANT**: Do NOT invent or guess CLI paths. Use ONLY the path above.
+
+   Parse JSON output to extract FEATURE_SPEC, IMPL_PLAN, SPECS_DIR, and BRANCH.
 
 2. **Load context** (use Read tool for all files):
    - **Read** spec.md and constitution.md from paths in AVAILABLE_DOCS

@@ -67,7 +67,9 @@ This command supports the following flags for branch-aware task generation (US4)
    speck check-prerequisites --json
    ```
 
-   Then parse the JSON output to extract FEATURE_DIR, AVAILABLE_DOCS, MODE, and other fields.
+   Parse JSON output to extract FEATURE_DIR, AVAILABLE_DOCS, MODE, and other fields.
+
+   **IMPORTANT**: Do NOT invent or guess CLI paths. Use ONLY the path above.
 
 3. **Load design documents**:
    Use Read tool to load files from the paths in AVAILABLE_DOCS:

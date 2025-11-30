@@ -25,7 +25,9 @@ You **MUST** consider the user input before proceeding (if not empty).
    speck check-prerequisites --json --require-tasks --include-tasks
    ```
 
-   Then parse the JSON output to extract MODE, FEATURE_DIR, and AVAILABLE_DOCS.
+   Parse JSON output to extract MODE, FEATURE_DIR, and AVAILABLE_DOCS.
+
+   **IMPORTANT**: Do NOT invent or guess CLI paths. Use ONLY the path above.
 
 2. **Check checklists status** (if checklists exist):
    - Find checklist files from AVAILABLE_DOCS (paths containing "/checklists/")

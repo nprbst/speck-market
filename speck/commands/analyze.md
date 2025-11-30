@@ -37,7 +37,9 @@ Use FEATURE_DIR and AVAILABLE_DOCS from this JSON.
 speck check-prerequisites --json --require-tasks --include-tasks
 ```
 
-Then parse the JSON output to extract FEATURE_DIR and AVAILABLE_DOCS.
+Parse JSON output to extract FEATURE_DIR and AVAILABLE_DOCS.
+
+**IMPORTANT**: Do NOT invent or guess CLI paths. Use ONLY the path above.
 
 Abort with an error message if any required file is missing (instruct the user to run missing prerequisite command).
 

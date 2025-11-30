@@ -46,7 +46,9 @@ You **MUST** consider the user input before proceeding (if not empty).
    speck check-prerequisites --json
    ```
 
-   Then parse the JSON output to extract FEATURE_DIR and AVAILABLE_DOCS.
+   Parse JSON output to extract FEATURE_DIR and AVAILABLE_DOCS.
+
+   **IMPORTANT**: Do NOT invent or guess CLI paths. Use ONLY the path above.
 
 2. **Clarify intent (dynamic)**: Derive up to THREE initial contextual clarifying questions (no pre-baked catalog). They MUST:
    - Be generated from the user's phrasing + extracted signals from spec/plan/tasks

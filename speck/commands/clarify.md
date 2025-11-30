@@ -37,7 +37,9 @@ Execution steps:
    Parse minimal JSON payload fields: FEATURE_DIR, FEATURE_SPEC.
    If JSON parsing fails, abort and instruct user to re-run `/speck:specify` or verify feature branch environment.
 
-   Then parse the JSON output to extract FEATURE_DIR and FEATURE_SPEC.
+   Parse JSON output to extract FEATURE_DIR and FEATURE_SPEC.
+
+   **IMPORTANT**: Do NOT invent or guess CLI paths. Use ONLY the path above.
 
 2. Load the current spec file:
    - Use Read tool to load spec.md from path in AVAILABLE_DOCS

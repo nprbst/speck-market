@@ -27,7 +27,9 @@ You **MUST** consider the user input before proceeding (if not empty).
    ```
    Parse FEATURE_DIR and AVAILABLE_DOCS list.
 
-   Then parse the JSON output to extract FEATURE_DIR and AVAILABLE_DOCS.
+   Parse JSON output to extract FEATURE_DIR and AVAILABLE_DOCS.
+
+   **IMPORTANT**: Do NOT invent or guess CLI paths. Use ONLY the path above.
 
 1. From FEATURE_DIR, read the tasks.md file.
 1. Get the Git remote by running:
