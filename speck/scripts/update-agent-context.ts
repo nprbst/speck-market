@@ -10,6 +10,16 @@
  * CLI Interface:
  * - No arguments required
  * - Exit Codes: 0 (success), 1 (user error)
+ *
+ * UPSTREAM VERSION TRACKING:
+ * - Based on: update-agent-context.sh from upstream spec-kit
+ * - Last synced: v0.0.86 (2025-11-26)
+ * - Upstream change in v0.0.86: Added IBM Bob agent support (BOB_FILE variable, bob case handler, all-agents logic)
+ * - TypeScript simplification: This implementation is intentionally simplified to ONLY update CLAUDE.md
+ *   - Does NOT support multi-agent CLI interface from bash version
+ *   - Does NOT accept agent type arguments
+ *   - Single-agent focus aligns with Speck's simplified scope
+ *   - Upstream multi-agent features (including new "bob" support) are intentionally NOT ported
  */
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";

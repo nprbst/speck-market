@@ -8071,10 +8071,8 @@ async function main2(args) {
   let branchName;
   let specId;
   let featureNum;
-  let isNonStandardBranch = false;
   if (options.branch) {
     branchName = options.branch;
-    isNonStandardBranch = !/^\d{3}-/.test(branchName);
     let branchSuffix;
     if (options.shortName) {
       branchSuffix = cleanBranchName(options.shortName);
@@ -9150,7 +9148,7 @@ function getRepoName2() {
   const remoteUrl = getGitRemoteUrl();
   if (remoteUrl) {
     const match = remoteUrl.match(/\/([^/]+?)(?:\.git)?$/) || remoteUrl.match(/:([^/]+?)(?:\.git)?$/);
-    if (match) {
+    if (match?.[1]) {
       return match[1];
     }
   }
@@ -9171,7 +9169,7 @@ function getGitUserName() {
 }
 function getTodayDate() {
   const now = new Date;
-  return now.toISOString().split("T")[0];
+  return now.toISOString().split("T")[0] ?? "";
 }
 function adjustPathForSpeckDepth(inputPath) {
   if (isAbsolute(inputPath)) {
@@ -9255,7 +9253,7 @@ function createReverseSymlink(speckRootPath, repoName, currentRepoPath) {
     return null;
   }
 }
-function runLink(targetPath, options) {
+function runLink(targetPath, _options) {
   const cwd = process.cwd();
   if (!existsSync9(targetPath)) {
     return {
@@ -9360,7 +9358,7 @@ function formatOutput2(result, options) {
   }
   return result.message;
 }
-async function main5(args) {
+function main5(args) {
   const { values, positionals } = parseArgs4({
     args,
     options: {
@@ -9368,7 +9366,8 @@ async function main5(args) {
     },
     allowPositionals: true
   });
-  if (positionals.length === 0) {
+  const targetPath = positionals[0];
+  if (!targetPath) {
     const errorMsg = `Error: Missing required argument <path>
 
 Usage: speck link <path> [--json]`;
@@ -9377,15 +9376,14 @@ Usage: speck link <path> [--json]`;
     } else {
       console.error(errorMsg);
     }
-    return 1;
+    return Promise.resolve(1);
   }
-  const targetPath = positionals[0];
   const options = {
     json: values.json ?? false
   };
   const result = runLink(targetPath, options);
   console.log(formatOutput2(result, options));
-  return result.success ? 0 : 1;
+  return Promise.resolve(result.success ? 0 : 1);
 }
 var init_link = __esm(() => {
   if (false) {}
@@ -9394,8 +9392,10 @@ var init_link = __esm(() => {
 // .speck/scripts/worktree/cli-launch-ide.ts
 var exports_cli_launch_ide = {};
 __export(exports_cli_launch_ide, {
+  main: () => main6,
   executeLaunchIDECommand: () => executeLaunchIDECommand
 });
+import { parseArgs as parseArgs5 } from "util";
 async function executeLaunchIDECommand(options) {
   const { worktreePath, repoPath = ".", json = false } = options;
   try {
@@ -9443,20 +9443,47 @@ async function executeLaunchIDECommand(options) {
     }
   }
 }
+async function main6(args) {
+  const { values } = parseArgs5({
+    args,
+    options: {
+      "worktree-path": { type: "string" },
+      "repo-path": { type: "string", default: "." },
+      json: { type: "boolean", default: false }
+    }
+  });
+  if (!values["worktree-path"]) {
+    console.error("Error: --worktree-path is required");
+    return 1;
+  }
+  try {
+    await executeLaunchIDECommand({
+      worktreePath: values["worktree-path"],
+      repoPath: values["repo-path"] ?? ".",
+      json: values.json ?? false
+    });
+    return 0;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("Error:", message);
+    return 1;
+  }
+}
 var init_cli_launch_ide = __esm(() => {
   init_config();
   init_ide_launch();
+  if (false) {}
 });
 
 // .speck/scripts/setup-plan.ts
 var exports_setup_plan = {};
 __export(exports_setup_plan, {
-  main: () => main6
+  main: () => main7
 });
 import { existsSync as existsSync10, mkdirSync as mkdirSync5, copyFileSync as copyFileSync2 } from "fs";
 import path6 from "path";
 var {$: $5 } = globalThis.Bun;
-function parseArgs5(args) {
+function parseArgs6(args) {
   return {
     json: args.includes("--json"),
     help: args.includes("--help") || args.includes("-h")
@@ -9467,8 +9494,8 @@ function showHelp4() {
   --json    Output results in JSON format
   --help    Show this help message`);
 }
-async function main6(args) {
-  const options = parseArgs5(args);
+async function main7(args) {
+  const options = parseArgs6(args);
   if (options.help) {
     showHelp4();
     return 0 /* SUCCESS */;
@@ -9563,7 +9590,7 @@ var init_setup_plan = __esm(async () => {
 // .speck/scripts/update-agent-context.ts
 var exports_update_agent_context = {};
 __export(exports_update_agent_context, {
-  main: () => main7
+  main: () => main8
 });
 import { existsSync as existsSync11, readFileSync as readFileSync5, writeFileSync as writeFileSync4 } from "fs";
 import path7 from "path";
@@ -9772,7 +9799,7 @@ function printSummary(lang, framework, db) {
     console.log(`  - Added database: ${db}`);
   }
 }
-async function main7(_args) {
+async function main8(_args) {
   const paths = await getFeaturePaths();
   if (!paths.CURRENT_BRANCH) {
     console.error("ERROR: Unable to determine current feature");
@@ -9808,12 +9835,12 @@ var init_update_agent_context = __esm(async () => {
 // .speck/scripts/next-feature.ts
 var exports_next_feature = {};
 __export(exports_next_feature, {
-  main: () => main8
+  main: () => main9
 });
 import { existsSync as existsSync12, readdirSync as readdirSync4 } from "fs";
 import path8 from "path";
 var {$: $6 } = globalThis.Bun;
-function parseArgs6(args) {
+function parseArgs7(args) {
   const options = {
     json: false,
     shortName: undefined,
@@ -9979,9 +10006,9 @@ async function checkShortNameExists(shortName, specsDir) {
 function cleanShortName(name) {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/-+/g, "-").replace(/^-/, "").replace(/-$/, "");
 }
-async function main8(args) {
+async function main9(args) {
   const startTime = Date.now();
-  const parseResult = parseArgs6(args);
+  const parseResult = parseArgs7(args);
   if (!parseResult.success) {
     const hasJsonFlag = args.includes("--json");
     const outputMode2 = detectOutputMode({ json: hasJsonFlag, hook: false });
@@ -10070,15 +10097,20 @@ var {
 // src/cli/index.ts
 import { readFileSync as readFileSync6, existsSync as existsSync13 } from "fs";
 import { join as join6, dirname as dirname3 } from "path";
-var lazyCheckPrerequisites = () => init_check_prerequisites().then(() => exports_check_prerequisites);
-var lazyCreateNewFeature = () => init_create_new_feature().then(() => exports_create_new_feature);
-var lazyEnvCommand = () => init_env_command().then(() => exports_env_command);
-var lazyInitCommand = () => Promise.resolve().then(() => (init_init(), exports_init));
-var lazyLinkCommand = () => Promise.resolve().then(() => (init_link(), exports_link));
-var lazyLaunchIDECommand = () => Promise.resolve().then(() => (init_cli_launch_ide(), exports_cli_launch_ide));
-var lazySetupPlan = () => init_setup_plan().then(() => exports_setup_plan);
-var lazyUpdateAgentContext = () => init_update_agent_context().then(() => exports_update_agent_context);
-var lazyNextFeature = () => init_next_feature().then(() => exports_next_feature);
+var commandRegistry = {
+  "check-prerequisites": () => init_check_prerequisites().then(() => exports_check_prerequisites),
+  "create-new-feature": () => init_create_new_feature().then(() => exports_create_new_feature),
+  env: () => init_env_command().then(() => exports_env_command),
+  init: () => Promise.resolve().then(() => (init_init(), exports_init)),
+  link: () => Promise.resolve().then(() => (init_link(), exports_link)),
+  "launch-ide": () => Promise.resolve().then(() => (init_cli_launch_ide(), exports_cli_launch_ide)),
+  "setup-plan": () => init_setup_plan().then(() => exports_setup_plan),
+  "update-agent-context": () => init_update_agent_context().then(() => exports_update_agent_context),
+  "next-feature": () => init_next_feature().then(() => exports_next_feature)
+};
+async function loadCommand(name) {
+  return commandRegistry[name]();
+}
 var globalState = {
   outputMode: "human"
 };
@@ -10151,58 +10183,56 @@ function createProgram() {
     processGlobalOptions(opts);
   });
   program2.command("init").description("Install Speck CLI globally via symlink to ~/.local/bin/speck").option("--json", "Output in JSON format").option("--force", "Force reinstall even if symlink exists").option("--worktree-enabled <bool>", "Enable worktree mode (true/false)").option("--ide-autolaunch <bool>", "Auto-launch IDE when creating features (true/false)").option("--ide-editor <editor>", "IDE editor choice (vscode/cursor/webstorm/idea/pycharm)").action(async (options) => {
-    const module = await lazyInitCommand();
+    const module = await loadCommand("init");
     const args = buildSubcommandArgs([], options);
     const exitCode = await module.main(args);
     process.exit(exitCode);
   });
   program2.command("link").description("Link repository to multi-repo speck root").argument("<path>", "Path to speck root directory").option("--json", "Output in JSON format").action(async (path9, options) => {
-    const module = await lazyLinkCommand();
+    const module = await loadCommand("link");
     const args = [path9, ...buildSubcommandArgs([], options)];
     const exitCode = await module.main(args);
     process.exit(exitCode);
   });
   program2.command("create-new-feature").description("Create a new feature specification directory").argument("<description>", "Feature description").option("--json", "Output in JSON format").option("--short-name <name>", "Custom short name for the branch").option("--number <n>", "Specify branch number manually", parseInt).option("--shared-spec", "Create spec at speckRoot (multi-repo shared spec)").option("--local-spec", "Create spec locally in child repo").option("--worktree", "Create a worktree for the feature branch (overrides config)").option("--no-worktree", "Skip worktree creation (overrides config)").option("--no-ide", "Skip IDE auto-launch").action(async (description, options, command) => {
-    const module = await lazyCreateNewFeature();
+    const module = await loadCommand("create-new-feature");
     const rawArgs = command.args.concat(process.argv.slice(3));
     const args = [description, ...buildSubcommandArgs([], options, rawArgs)];
     const exitCode = await module.main(args);
     process.exit(exitCode);
   });
   program2.command("check-prerequisites").description("Validate feature directory structure and prerequisites").option("--json", "Output in JSON format").option("--hook", "Output hook-formatted response").option("--require-tasks", "Require tasks.md to exist").option("--include-tasks", "Include tasks.md in available docs list").option("--paths-only", "Only output path variables").option("--skip-feature-check", "Skip feature directory validation").option("--skip-plan-check", "Skip plan.md validation").option("--include-file-contents", "Include file contents in output").option("--include-workflow-mode", "Include workflow mode in output").option("--validate-code-quality", "Validate TypeScript typecheck and ESLint").action(async (options) => {
-    const module = await lazyCheckPrerequisites();
+    const module = await loadCommand("check-prerequisites");
     const args = buildSubcommandArgs([], options);
     const exitCode = await module.main(args);
     process.exit(exitCode);
   });
   program2.command("env").description("Show Speck environment and configuration info").option("--json", "Output as JSON").option("--hook", "Output hook-formatted response").action(async (options) => {
-    const module = await lazyEnvCommand();
+    const module = await loadCommand("env");
     const args = buildSubcommandArgs([], options);
     const exitCode = await module.main(args);
     process.exit(exitCode);
   });
   program2.command("launch-ide").description("Launch IDE in worktree (for deferred IDE launch)").requiredOption("--worktree-path <path>", "Path to worktree directory").option("--repo-path <path>", "Path to repository root for config (default: .)").option("--json", "Output as JSON").action(async (options) => {
-    const module = await lazyLaunchIDECommand();
-    await module.executeLaunchIDECommand({
-      worktreePath: options.worktreePath,
-      repoPath: options.repoPath || ".",
-      json: options.json === true
-    });
+    const module = await loadCommand("launch-ide");
+    const args = buildSubcommandArgs([], options);
+    const exitCode = await module.main(args);
+    process.exit(exitCode);
   });
   program2.command("setup-plan").description("Set up plan.md for the current feature").option("--json", "Output in JSON format").action(async (options) => {
-    const module = await lazySetupPlan();
+    const module = await loadCommand("setup-plan");
     const args = buildSubcommandArgs([], options);
     const exitCode = await module.main(args);
     process.exit(exitCode);
   });
   program2.command("update-agent-context").description("Update CLAUDE.md context file with technology stack from current feature").option("--json", "Output in JSON format").action(async (options) => {
-    const module = await lazyUpdateAgentContext();
+    const module = await loadCommand("update-agent-context");
     const args = buildSubcommandArgs([], options);
     const exitCode = await module.main(args);
     process.exit(exitCode);
   });
   program2.command("next-feature").description("Get next feature number and detect multi-repo mode").option("--json", "Output in JSON format").option("--short-name <name>", "Short name to check for existing branches").action(async (options) => {
-    const module = await lazyNextFeature();
+    const module = await loadCommand("next-feature");
     const args = buildSubcommandArgs([], options);
     const exitCode = await module.main(args);
     process.exit(exitCode);
@@ -10227,14 +10257,14 @@ function createProgram() {
   });
   return program2;
 }
-async function main9() {
+async function main10() {
   const program2 = createProgram();
   if (process.argv.length === 2) {
     program2.help();
   }
   await program2.parseAsync(process.argv);
 }
-main9().catch((error) => {
+main10().catch((error) => {
   const message = error instanceof Error ? error.message : String(error);
   console.error("Fatal error:", message);
   process.exit(1);

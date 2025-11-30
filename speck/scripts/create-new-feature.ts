@@ -478,12 +478,10 @@ export async function main(args: string[]): Promise<number> {
   let branchName: string;
   let specId: string; // The spec directory name (always NNN-short-name format)
   let featureNum: string; // Numeric prefix for output (e.g., "015")
-  let isNonStandardBranch = false;
 
   if (options.branch) {
     // T081: Custom branch name provided - use as-is
     branchName = options.branch;
-    isNonStandardBranch = !/^\d{3}-/.test(branchName);
 
     // Still need to generate spec ID (directory name)
     let branchSuffix: string;

@@ -9,6 +9,7 @@
  * @feature 015-scope-simplification
  */
 
+import { parseArgs } from "node:util";
 import { loadConfig } from "./config";
 import { launchIDE } from "./ide-launch";
 
@@ -84,4 +85,43 @@ export async function executeLaunchIDECommand(
     }
     // IDE launch failure is non-fatal
   }
+}
+
+/**
+ * CLI main function - parses args and calls executeLaunchIDECommand
+ * Provides uniform interface matching other speck commands
+ */
+export async function main(args: string[]): Promise<number> {
+  const { values } = parseArgs({
+    args,
+    options: {
+      "worktree-path": { type: "string" },
+      "repo-path": { type: "string", default: "." },
+      json: { type: "boolean", default: false },
+    },
+  });
+
+  if (!values["worktree-path"]) {
+    console.error("Error: --worktree-path is required");
+    return 1;
+  }
+
+  try {
+    await executeLaunchIDECommand({
+      worktreePath: values["worktree-path"],
+      repoPath: values["repo-path"] ?? ".",
+      json: values.json ?? false,
+    });
+    return 0;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("Error:", message);
+    return 1;
+  }
+}
+
+if (import.meta.main) {
+  void main(process.argv.slice(2)).then((exitCode) => {
+    process.exit(exitCode);
+  });
 }
