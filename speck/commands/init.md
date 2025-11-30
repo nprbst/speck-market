@@ -47,7 +47,13 @@ Before running `speck init`, ask the user about their preferences:
 After collecting user preferences, run:
 
 ```bash
-which speck && speck init [FLAGS] || bun $HOME/.claude/plugins/marketplaces/speck-market/speck/dist/speck-cli.js init [FLAGS]
+speck init [FLAGS]
+```
+
+If the command fails (speck not found in PATH), fall back to running via bun in a **separate Bash call**:
+
+```bash
+bun $HOME/.claude/plugins/marketplaces/speck-market/speck/dist/speck-cli.js init [FLAGS]
 ```
 
 Replace `[FLAGS]` with the appropriate flags based on user responses:
