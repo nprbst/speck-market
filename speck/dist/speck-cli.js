@@ -8380,19 +8380,29 @@ async function displayEnvironmentStatus(outputMode, startTime) {
 async function displayTextOutput(config, context) {
   console.log(`=== Speck Environment Status ===
 `);
-  displayMultiRepoContext(context);
+  await displayMultiRepoContext(context);
   await displayBranchMappingStatus(config, context);
 }
-function displayMultiRepoContext(context) {
+async function displayMultiRepoContext(context) {
+  let currentBranch = "";
+  try {
+    currentBranch = await getCurrentBranch2(context.repoRoot);
+  } catch {}
   if (context.mode === "single-repo") {
     console.log("Mode: Single-repo");
     console.log(`  Repo Root: ${context.repoRoot}`);
     console.log(`  Specs Directory: ${context.specsDir}`);
+    if (currentBranch) {
+      console.log(`  Current Branch: ${currentBranch}`);
+    }
     console.log("");
   } else if (context.context === "root") {
     console.log("Mode: Multi-repo (Root)");
     console.log(`  Speck Root: ${context.speckRoot}`);
     console.log(`  Specs Directory: ${context.specsDir}`);
+    if (currentBranch) {
+      console.log(`  Current Branch: ${currentBranch}`);
+    }
     console.log("");
   } else if (context.context === "child") {
     console.log("Mode: Multi-repo (Child Repository)");
@@ -8400,6 +8410,9 @@ function displayMultiRepoContext(context) {
     console.log(`  Parent Spec: ${context.parentSpecId || "Unknown"}`);
     console.log(`  Repo Root: ${context.repoRoot}`);
     console.log(`  Speck Root: ${context.speckRoot}`);
+    if (currentBranch) {
+      console.log(`  Current Branch: ${currentBranch}`);
+    }
     console.log("");
   }
 }
@@ -8478,12 +8491,17 @@ async function displayLocalStatus(repoRoot) {
   }
 }
 async function buildEnvOutputData(_config, context) {
+  let currentBranch = "";
+  try {
+    currentBranch = await getCurrentBranch2(context.repoRoot);
+  } catch {}
   const output = {
     mode: context.mode,
     context: context.context,
     speckRoot: context.speckRoot,
     repoRoot: context.repoRoot,
-    specsDir: context.specsDir
+    specsDir: context.specsDir,
+    currentBranch: currentBranch || undefined
   };
   if (context.context === "child") {
     output.childRepoName = context.childRepoName;
@@ -9126,27 +9144,8 @@ var exports_update_agent_context = {};
 __export(exports_update_agent_context, {
   main: () => main6
 });
-import { existsSync as existsSync9, mkdirSync as mkdirSync5, readFileSync as readFileSync4, writeFileSync as writeFileSync3 } from "fs";
+import { existsSync as existsSync9, readFileSync as readFileSync4, writeFileSync as writeFileSync3 } from "fs";
 import path7 from "path";
-function getAgentFilePaths(repoRoot) {
-  return {
-    claude: path7.join(repoRoot, "CLAUDE.md"),
-    gemini: path7.join(repoRoot, "GEMINI.md"),
-    copilot: path7.join(repoRoot, ".github/agents/copilot-instructions.md"),
-    "cursor-agent": path7.join(repoRoot, ".cursor/rules/specify-rules.mdc"),
-    qwen: path7.join(repoRoot, "QWEN.md"),
-    opencode: path7.join(repoRoot, "AGENTS.md"),
-    codex: path7.join(repoRoot, "AGENTS.md"),
-    windsurf: path7.join(repoRoot, ".windsurf/rules/specify-rules.md"),
-    kilocode: path7.join(repoRoot, ".kilocode/rules/specify-rules.md"),
-    auggie: path7.join(repoRoot, ".augment/rules/specify-rules.md"),
-    roo: path7.join(repoRoot, ".roo/rules/specify-rules.md"),
-    codebuddy: path7.join(repoRoot, "CODEBUDDY.md"),
-    amp: path7.join(repoRoot, "AGENTS.md"),
-    shai: path7.join(repoRoot, "SHAI.md"),
-    q: path7.join(repoRoot, "AGENTS.md")
-  };
-}
 function extractPlanField(fieldPattern, planContent) {
   const regex = new RegExp(`^\\*\\*${fieldPattern}\\*\\*: (.+)$`, "m");
   const match = planContent.match(regex);
@@ -9216,12 +9215,12 @@ function getCommandsForLanguage(lang) {
 function getLanguageConventions(lang) {
   return `${lang ?? "Unknown"}: Follow standard conventions`;
 }
-function createNewAgentFile(targetFile, templateFile, projectName, currentDate, currentBranch, lang, framework, projectType) {
+function createNewClaudeFile(targetFile, templateFile, projectName, currentDate, currentBranch, lang, framework, projectType) {
   if (!existsSync9(templateFile)) {
     console.error(`ERROR: Template not found at ${templateFile}`);
     process.exit(1 /* USER_ERROR */);
   }
-  console.log("INFO: Creating new agent context file from template...");
+  console.log("INFO: Creating new CLAUDE.md from template...");
   let content = readFileSync4(templateFile, "utf-8");
   let techStack = "";
   let recentChange = "";
@@ -9249,10 +9248,10 @@ function createNewAgentFile(targetFile, templateFile, projectName, currentDate, 
   content = content.replace(/\[LANGUAGE-SPECIFIC, ONLY FOR LANGUAGES IN USE\]/g, languageConventions);
   content = content.replace(/\[LAST 3 FEATURES AND WHAT THEY ADDED\]/g, recentChange);
   writeFileSync3(targetFile, content, "utf-8");
-  console.log(`\u2713 Created new agent context file`);
+  console.log(`\u2713 Created CLAUDE.md`);
 }
-function updateExistingAgentFile(targetFile, currentDate, currentBranch, lang, framework, db) {
-  console.log("INFO: Updating existing agent context file...");
+function updateExistingClaudeFile(targetFile, currentDate, currentBranch, lang, framework, db) {
+  console.log("INFO: Updating existing CLAUDE.md...");
   const content = readFileSync4(targetFile, "utf-8");
   const lines = content.split(`
 `);
@@ -9325,77 +9324,18 @@ function updateExistingAgentFile(targetFile, currentDate, currentBranch, lang, f
   }
   writeFileSync3(targetFile, output.join(`
 `), "utf-8");
-  console.log(`\u2713 Updated existing agent context file`);
+  console.log(`\u2713 Updated CLAUDE.md`);
 }
-function updateAgentFile(targetFile, agentName, repoRoot, currentBranch, lang, framework, db, projectType) {
-  console.log(`INFO: Updating ${agentName} context file: ${targetFile}`);
+function updateClaudeFile(repoRoot, currentBranch, lang, framework, db, projectType) {
+  const targetFile = path7.join(repoRoot, "CLAUDE.md");
+  console.log(`INFO: Updating CLAUDE.md: ${targetFile}`);
   const projectName = path7.basename(repoRoot);
   const currentDate = new Date().toISOString().split("T")[0];
-  const targetDir = path7.dirname(targetFile);
-  if (!existsSync9(targetDir)) {
-    mkdirSync5(targetDir, { recursive: true });
-  }
   const templateFile = path7.join(getTemplatesDir(), "agent-file-template.md");
   if (!existsSync9(targetFile)) {
-    createNewAgentFile(targetFile, templateFile, projectName, currentDate, currentBranch, lang, framework, projectType);
+    createNewClaudeFile(targetFile, templateFile, projectName, currentDate, currentBranch, lang, framework, projectType);
   } else {
-    updateExistingAgentFile(targetFile, currentDate, currentBranch, lang, framework, db);
-  }
-}
-function updateSpecificAgent(agentType, agentPaths, repoRoot, currentBranch, lang, framework, db, projectType) {
-  const agentNames = {
-    claude: "Claude Code",
-    gemini: "Gemini CLI",
-    copilot: "GitHub Copilot",
-    "cursor-agent": "Cursor IDE",
-    qwen: "Qwen Code",
-    opencode: "opencode",
-    codex: "Codex CLI",
-    windsurf: "Windsurf",
-    kilocode: "Kilo Code",
-    auggie: "Auggie CLI",
-    roo: "Roo Code",
-    codebuddy: "CodeBuddy CLI",
-    amp: "Amp",
-    shai: "SHAI",
-    q: "Amazon Q Developer CLI"
-  };
-  if (!(agentType in agentPaths)) {
-    console.error(`ERROR: Unknown agent type '${agentType}'`);
-    console.error("Expected: claude|gemini|copilot|cursor-agent|qwen|opencode|codex|windsurf|kilocode|auggie|roo|amp|shai|q");
-    process.exit(1 /* USER_ERROR */);
-  }
-  const targetFile = agentPaths[agentType];
-  const agentName = agentNames[agentType];
-  updateAgentFile(targetFile, agentName, repoRoot, currentBranch, lang, framework, db, projectType);
-}
-function updateAllExistingAgents(agentPaths, repoRoot, currentBranch, lang, framework, db, projectType) {
-  let foundAgent = false;
-  const agentConfigs = [
-    { key: "claude", name: "Claude Code" },
-    { key: "gemini", name: "Gemini CLI" },
-    { key: "copilot", name: "GitHub Copilot" },
-    { key: "cursor-agent", name: "Cursor IDE" },
-    { key: "qwen", name: "Qwen Code" },
-    { key: "opencode", name: "Codex/opencode" },
-    { key: "windsurf", name: "Windsurf" },
-    { key: "kilocode", name: "Kilo Code" },
-    { key: "auggie", name: "Auggie CLI" },
-    { key: "roo", name: "Roo Code" },
-    { key: "codebuddy", name: "CodeBuddy CLI" },
-    { key: "shai", name: "SHAI" },
-    { key: "q", name: "Amazon Q Developer CLI" }
-  ];
-  for (const { key, name } of agentConfigs) {
-    const targetFile = agentPaths[key];
-    if (existsSync9(targetFile)) {
-      updateAgentFile(targetFile, name, repoRoot, currentBranch, lang, framework, db, projectType);
-      foundAgent = true;
-    }
-  }
-  if (!foundAgent) {
-    console.log("INFO: No existing agent files found, creating default Claude file...");
-    updateAgentFile(agentPaths.claude, "Claude Code", repoRoot, currentBranch, lang, framework, db, projectType);
+    updateExistingClaudeFile(targetFile, currentDate, currentBranch, lang, framework, db);
   }
 }
 function printSummary(lang, framework, db) {
@@ -9410,11 +9350,8 @@ function printSummary(lang, framework, db) {
   if (db && db !== "N/A") {
     console.log(`  - Added database: ${db}`);
   }
-  console.log("");
-  console.log("INFO: Usage: update-agent-context [claude|gemini|copilot|cursor-agent|qwen|opencode|codex|windsurf|kilocode|auggie|codebuddy|shai|q]");
 }
-async function main6(args) {
-  const agentType = args[0] || "";
+async function main6(_args) {
   const paths = await getFeaturePaths();
   if (!paths.CURRENT_BRANCH) {
     console.error("ERROR: Unable to determine current feature");
@@ -9433,18 +9370,12 @@ async function main6(args) {
     }
     return 1 /* USER_ERROR */;
   }
-  console.log(`INFO: === Updating agent context files for feature ${paths.CURRENT_BRANCH} ===`);
+  console.log(`INFO: === Updating CLAUDE.md for feature ${paths.CURRENT_BRANCH} ===`);
   const planData = parsePlanData(paths.IMPL_PLAN);
-  const agentPaths = getAgentFilePaths(paths.REPO_ROOT);
-  if (!agentType) {
-    console.log("INFO: No agent specified, updating all existing agent files...");
-    updateAllExistingAgents(agentPaths, paths.REPO_ROOT, paths.CURRENT_BRANCH, planData.lang, planData.framework, planData.db, planData.projectType);
-  } else {
-    console.log(`INFO: Updating specific agent: ${agentType}`);
-    updateSpecificAgent(agentType, agentPaths, paths.REPO_ROOT, paths.CURRENT_BRANCH, planData.lang, planData.framework, planData.db, planData.projectType);
-  }
+  updateClaudeFile(paths.REPO_ROOT, paths.CURRENT_BRANCH, planData.lang, planData.framework, planData.db, planData.projectType);
   printSummary(planData.lang, planData.framework, planData.db);
-  console.log("\u2713 Agent context update completed successfully");
+  console.log("");
+  console.log("\u2713 CLAUDE.md update completed successfully");
   return 0 /* SUCCESS */;
 }
 var init_update_agent_context = __esm(async () => {
@@ -9583,9 +9514,9 @@ function createProgram() {
     const exitCode = await module.main(args);
     process.exit(exitCode);
   });
-  program2.command("update-agent-context").description("Update agent-specific context files with technology stack").argument("[agent]", "Agent type (claude, gemini, copilot, cursor-agent, qwen, opencode, codex, windsurf, kilocode, auggie, roo, codebuddy, amp, shai, q)").option("--json", "Output in JSON format").action(async (agent, options) => {
+  program2.command("update-agent-context").description("Update CLAUDE.md context file with technology stack from current feature").option("--json", "Output in JSON format").action(async (options) => {
     const module = await lazyUpdateAgentContext();
-    const args = agent ? [agent, ...buildSubcommandArgs([], options)] : buildSubcommandArgs([], options);
+    const args = buildSubcommandArgs([], options);
     const exitCode = await module.main(args);
     process.exit(exitCode);
   });

@@ -3,77 +3,19 @@
 /**
  * Update Agent Context Script
  *
- * Bun TypeScript implementation of update-agent-context.sh
+ * Updates CLAUDE.md with technology stack information from the current feature's plan.
  *
- * Transformation Date: 2025-11-15
- * Source: upstream/v0.0.85/.specify/scripts/bash/update-agent-context.sh
- * Strategy: Pure TypeScript (file I/O, string parsing, regex)
- *
- * Changes from v0.0.84 to v0.0.85:
- * - Upstream added CDPATH="" to cd command for SCRIPT_DIR (security fix)
- * - TypeScript implementation already immune: uses import.meta.dir instead of cd
- * - No code changes needed, only documentation updated to track v0.0.85
+ * Feature: 015-scope-simplification
  *
  * CLI Interface:
- * - Arguments: [agent_type] (optional)
- * - Agent types: claude|gemini|copilot|cursor-agent|qwen|opencode|codex|windsurf|kilocode|auggie|shai|q
+ * - No arguments required
  * - Exit Codes: 0 (success), 1 (user error)
- *
- * Transformation Rationale:
- * - Replaced bash file parsing with native TypeScript string operations
- * - Replaced sed operations with TypeScript string replacement
- * - Replaced bash functions with TypeScript functions
- * - Preserved all logic including multi-agent support
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { getFeaturePaths, getTemplatesDir } from "./common/paths";
 import { ExitCode } from "./contracts/cli-interface";
-
-/**
- * Agent file paths configuration
- */
-interface AgentFilePaths {
-  claude: string;
-  gemini: string;
-  copilot: string;
-  "cursor-agent": string;
-  qwen: string;
-  opencode: string;
-  codex: string;
-  windsurf: string;
-  kilocode: string;
-  auggie: string;
-  roo: string;
-  codebuddy: string;
-  amp: string;
-  shai: string;
-  q: string;
-}
-
-/**
- * Get agent file paths
- */
-function getAgentFilePaths(repoRoot: string): AgentFilePaths {
-  return {
-    claude: path.join(repoRoot, "CLAUDE.md"),
-    gemini: path.join(repoRoot, "GEMINI.md"),
-    copilot: path.join(repoRoot, ".github/agents/copilot-instructions.md"),
-    "cursor-agent": path.join(repoRoot, ".cursor/rules/specify-rules.mdc"),
-    qwen: path.join(repoRoot, "QWEN.md"),
-    opencode: path.join(repoRoot, "AGENTS.md"),
-    codex: path.join(repoRoot, "AGENTS.md"),
-    windsurf: path.join(repoRoot, ".windsurf/rules/specify-rules.md"),
-    kilocode: path.join(repoRoot, ".kilocode/rules/specify-rules.md"),
-    auggie: path.join(repoRoot, ".augment/rules/specify-rules.md"),
-    roo: path.join(repoRoot, ".roo/rules/specify-rules.md"),
-    codebuddy: path.join(repoRoot, "CODEBUDDY.md"),
-    amp: path.join(repoRoot, "AGENTS.md"),
-    shai: path.join(repoRoot, "SHAI.md"),
-    q: path.join(repoRoot, "AGENTS.md"),
-  };
-}
 
 /**
  * Extract plan field by pattern
@@ -183,9 +125,9 @@ function getLanguageConventions(lang: string | undefined): string {
 }
 
 /**
- * Create new agent file from template
+ * Create new CLAUDE.md from template
  */
-function createNewAgentFile(
+function createNewClaudeFile(
   targetFile: string,
   templateFile: string,
   projectName: string,
@@ -200,7 +142,7 @@ function createNewAgentFile(
     process.exit(ExitCode.USER_ERROR);
   }
 
-  console.log("INFO: Creating new agent context file from template...");
+  console.log("INFO: Creating new CLAUDE.md from template...");
 
   let content = readFileSync(templateFile, "utf-8");
 
@@ -236,13 +178,13 @@ function createNewAgentFile(
   content = content.replace(/\[LAST 3 FEATURES AND WHAT THEY ADDED\]/g, recentChange);
 
   writeFileSync(targetFile, content, "utf-8");
-  console.log(`✓ Created new agent context file`);
+  console.log(`✓ Created CLAUDE.md`);
 }
 
 /**
- * Update existing agent file
+ * Update existing CLAUDE.md
  */
-function updateExistingAgentFile(
+function updateExistingClaudeFile(
   targetFile: string,
   currentDate: string,
   currentBranch: string,
@@ -250,7 +192,7 @@ function updateExistingAgentFile(
   framework: string | undefined,
   db: string | undefined
 ): void {
-  console.log("INFO: Updating existing agent context file...");
+  console.log("INFO: Updating existing CLAUDE.md...");
 
   const content = readFileSync(targetFile, "utf-8");
   const lines = content.split("\n");
@@ -341,15 +283,13 @@ function updateExistingAgentFile(
   }
 
   writeFileSync(targetFile, output.join("\n"), "utf-8");
-  console.log(`✓ Updated existing agent context file`);
+  console.log(`✓ Updated CLAUDE.md`);
 }
 
 /**
- * Update agent file
+ * Update CLAUDE.md file
  */
-function updateAgentFile(
-  targetFile: string,
-  agentName: string,
+function updateClaudeFile(
   repoRoot: string,
   currentBranch: string,
   lang: string | undefined,
@@ -357,112 +297,20 @@ function updateAgentFile(
   db: string | undefined,
   projectType: string | undefined
 ): void {
-  console.log(`INFO: Updating ${agentName} context file: ${targetFile}`);
+  const targetFile = path.join(repoRoot, "CLAUDE.md");
+  console.log(`INFO: Updating CLAUDE.md: ${targetFile}`);
 
   const projectName = path.basename(repoRoot);
   const currentDate = new Date().toISOString().split("T")[0]!;
-
-  // Create directory if it doesn't exist
-  const targetDir = path.dirname(targetFile);
-  if (!existsSync(targetDir)) {
-    mkdirSync(targetDir, { recursive: true });
-  }
 
   const templateFile = path.join(getTemplatesDir(), "agent-file-template.md");
 
   if (!existsSync(targetFile)) {
     // Create new file from template
-    createNewAgentFile(targetFile, templateFile, projectName, currentDate, currentBranch, lang, framework, projectType);
+    createNewClaudeFile(targetFile, templateFile, projectName, currentDate, currentBranch, lang, framework, projectType);
   } else {
     // Update existing file
-    updateExistingAgentFile(targetFile, currentDate, currentBranch, lang, framework, db);
-  }
-}
-
-/**
- * Update specific agent
- */
-function updateSpecificAgent(
-  agentType: string,
-  agentPaths: AgentFilePaths,
-  repoRoot: string,
-  currentBranch: string,
-  lang: string | undefined,
-  framework: string | undefined,
-  db: string | undefined,
-  projectType: string | undefined
-): void {
-  const agentNames: Record<string, string> = {
-    claude: "Claude Code",
-    gemini: "Gemini CLI",
-    copilot: "GitHub Copilot",
-    "cursor-agent": "Cursor IDE",
-    qwen: "Qwen Code",
-    opencode: "opencode",
-    codex: "Codex CLI",
-    windsurf: "Windsurf",
-    kilocode: "Kilo Code",
-    auggie: "Auggie CLI",
-    roo: "Roo Code",
-    codebuddy: "CodeBuddy CLI",
-    amp: "Amp",
-    shai: "SHAI",
-    q: "Amazon Q Developer CLI",
-  };
-
-  if (!(agentType in agentPaths)) {
-    console.error(`ERROR: Unknown agent type '${agentType}'`);
-    console.error("Expected: claude|gemini|copilot|cursor-agent|qwen|opencode|codex|windsurf|kilocode|auggie|roo|amp|shai|q");
-    process.exit(ExitCode.USER_ERROR);
-  }
-
-  const targetFile = agentPaths[agentType as keyof AgentFilePaths];
-  const agentName = agentNames[agentType]!;
-  updateAgentFile(targetFile, agentName, repoRoot, currentBranch, lang, framework, db, projectType);
-}
-
-/**
- * Update all existing agents
- */
-function updateAllExistingAgents(
-  agentPaths: AgentFilePaths,
-  repoRoot: string,
-  currentBranch: string,
-  lang: string | undefined,
-  framework: string | undefined,
-  db: string | undefined,
-  projectType: string | undefined
-): void {
-  let foundAgent = false;
-
-  const agentConfigs = [
-    { key: "claude", name: "Claude Code" },
-    { key: "gemini", name: "Gemini CLI" },
-    { key: "copilot", name: "GitHub Copilot" },
-    { key: "cursor-agent", name: "Cursor IDE" },
-    { key: "qwen", name: "Qwen Code" },
-    { key: "opencode", name: "Codex/opencode" },
-    { key: "windsurf", name: "Windsurf" },
-    { key: "kilocode", name: "Kilo Code" },
-    { key: "auggie", name: "Auggie CLI" },
-    { key: "roo", name: "Roo Code" },
-    { key: "codebuddy", name: "CodeBuddy CLI" },
-    { key: "shai", name: "SHAI" },
-    { key: "q", name: "Amazon Q Developer CLI" },
-  ];
-
-  for (const { key, name } of agentConfigs) {
-    const targetFile = agentPaths[key as keyof AgentFilePaths];
-    if (existsSync(targetFile)) {
-      updateAgentFile(targetFile, name, repoRoot, currentBranch, lang, framework, db, projectType);
-      foundAgent = true;
-    }
-  }
-
-  // If no agent files exist, create a default Claude file
-  if (!foundAgent) {
-    console.log("INFO: No existing agent files found, creating default Claude file...");
-    updateAgentFile(agentPaths.claude, "Claude Code", repoRoot, currentBranch, lang, framework, db, projectType);
+    updateExistingClaudeFile(targetFile, currentDate, currentBranch, lang, framework, db);
   }
 }
 
@@ -484,17 +332,12 @@ function printSummary(lang: string | undefined, framework: string | undefined, d
   if (db && db !== "N/A") {
     console.log(`  - Added database: ${db}`);
   }
-
-  console.log("");
-  console.log("INFO: Usage: update-agent-context [claude|gemini|copilot|cursor-agent|qwen|opencode|codex|windsurf|kilocode|auggie|codebuddy|shai|q]");
 }
 
 /**
  * Main function
  */
-export async function main(args: string[]): Promise<number> {
-  const agentType = args[0] || "";
-
+export async function main(_args: string[]): Promise<number> {
   // Get feature paths
   const paths = await getFeaturePaths();
 
@@ -518,46 +361,26 @@ export async function main(args: string[]): Promise<number> {
     return ExitCode.USER_ERROR;
   }
 
-  console.log(`INFO: === Updating agent context files for feature ${paths.CURRENT_BRANCH} ===`);
+  console.log(`INFO: === Updating CLAUDE.md for feature ${paths.CURRENT_BRANCH} ===`);
 
   // Parse plan data
   const planData = parsePlanData(paths.IMPL_PLAN);
 
-  // Get agent file paths
-  const agentPaths = getAgentFilePaths(paths.REPO_ROOT);
-
-  // Process based on agent type argument
-  if (!agentType) {
-    // No specific agent provided - update all existing agent files
-    console.log("INFO: No agent specified, updating all existing agent files...");
-    updateAllExistingAgents(
-      agentPaths,
-      paths.REPO_ROOT,
-      paths.CURRENT_BRANCH,
-      planData.lang,
-      planData.framework,
-      planData.db,
-      planData.projectType
-    );
-  } else {
-    // Specific agent provided - update only that agent
-    console.log(`INFO: Updating specific agent: ${agentType}`);
-    updateSpecificAgent(
-      agentType,
-      agentPaths,
-      paths.REPO_ROOT,
-      paths.CURRENT_BRANCH,
-      planData.lang,
-      planData.framework,
-      planData.db,
-      planData.projectType
-    );
-  }
+  // Update CLAUDE.md
+  updateClaudeFile(
+    paths.REPO_ROOT,
+    paths.CURRENT_BRANCH,
+    planData.lang,
+    planData.framework,
+    planData.db,
+    planData.projectType
+  );
 
   // Print summary
   printSummary(planData.lang, planData.framework, planData.db);
 
-  console.log("✓ Agent context update completed successfully");
+  console.log("");
+  console.log("✓ CLAUDE.md update completed successfully");
   return ExitCode.SUCCESS;
 }
 
