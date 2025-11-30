@@ -9049,7 +9049,8 @@ var init_init = __esm(() => {
     "Bash(git log:*)",
     "Bash(git ls-remote:*)",
     "Bash(git ls:*)",
-    "Bash(git status)"
+    "Bash(git status)",
+    "Bash(speck:*)"
   ];
   if (false) {}
 });
