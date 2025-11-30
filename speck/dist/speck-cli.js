@@ -9121,6 +9121,338 @@ var init_setup_plan = __esm(async () => {
   if (false) {}
 });
 
+// .speck/scripts/update-agent-context.ts
+var exports_update_agent_context = {};
+__export(exports_update_agent_context, {
+  main: () => main6
+});
+import { existsSync as existsSync9, mkdirSync as mkdirSync5, readFileSync as readFileSync4, writeFileSync as writeFileSync3 } from "fs";
+import path7 from "path";
+function getAgentFilePaths(repoRoot) {
+  return {
+    claude: path7.join(repoRoot, "CLAUDE.md"),
+    gemini: path7.join(repoRoot, "GEMINI.md"),
+    copilot: path7.join(repoRoot, ".github/agents/copilot-instructions.md"),
+    "cursor-agent": path7.join(repoRoot, ".cursor/rules/specify-rules.mdc"),
+    qwen: path7.join(repoRoot, "QWEN.md"),
+    opencode: path7.join(repoRoot, "AGENTS.md"),
+    codex: path7.join(repoRoot, "AGENTS.md"),
+    windsurf: path7.join(repoRoot, ".windsurf/rules/specify-rules.md"),
+    kilocode: path7.join(repoRoot, ".kilocode/rules/specify-rules.md"),
+    auggie: path7.join(repoRoot, ".augment/rules/specify-rules.md"),
+    roo: path7.join(repoRoot, ".roo/rules/specify-rules.md"),
+    codebuddy: path7.join(repoRoot, "CODEBUDDY.md"),
+    amp: path7.join(repoRoot, "AGENTS.md"),
+    shai: path7.join(repoRoot, "SHAI.md"),
+    q: path7.join(repoRoot, "AGENTS.md")
+  };
+}
+function extractPlanField(fieldPattern, planContent) {
+  const regex = new RegExp(`^\\*\\*${fieldPattern}\\*\\*: (.+)$`, "m");
+  const match = planContent.match(regex);
+  if (!match || !match[1])
+    return "";
+  const value = match[1].trim();
+  if (value === "NEEDS CLARIFICATION" || value === "N/A") {
+    return "";
+  }
+  return value;
+}
+function parsePlanData(planFile) {
+  if (!existsSync9(planFile)) {
+    console.error(`ERROR: Plan file not found: ${planFile}`);
+    process.exit(1 /* USER_ERROR */);
+  }
+  const content = readFileSync4(planFile, "utf-8");
+  const lang = extractPlanField("Language/Version", content);
+  const framework = extractPlanField("Primary Dependencies", content);
+  const db = extractPlanField("Storage", content);
+  const projectType = extractPlanField("Project Type", content);
+  if (lang) {
+    console.log(`INFO: Found language: ${lang}`);
+  } else {
+    console.error("WARNING: No language information found in plan");
+  }
+  if (framework) {
+    console.log(`INFO: Found framework: ${framework}`);
+  }
+  if (db && db !== "N/A") {
+    console.log(`INFO: Found database: ${db}`);
+  }
+  if (projectType) {
+    console.log(`INFO: Found project type: ${projectType}`);
+  }
+  return { lang, framework, db, projectType };
+}
+function formatTechnologyStack(lang, framework) {
+  const parts = [];
+  if (lang && lang !== "NEEDS CLARIFICATION") {
+    parts.push(lang);
+  }
+  if (framework && framework !== "NEEDS CLARIFICATION" && framework !== "N/A") {
+    parts.push(framework);
+  }
+  return parts.join(" + ");
+}
+function getProjectStructure(projectType) {
+  if (projectType?.toLowerCase().includes("web")) {
+    return `backend/
+frontend/
+tests/`;
+  }
+  return `src/
+tests/`;
+}
+function getCommandsForLanguage(lang) {
+  if (lang?.includes("Python")) {
+    return "cd src && pytest && ruff check .";
+  } else if (lang?.includes("Rust")) {
+    return "cargo test && cargo clippy";
+  } else if (lang?.includes("JavaScript") || lang?.includes("TypeScript")) {
+    return "npm test && npm run lint";
+  }
+  return `# Add commands for ${lang ?? "Unknown"}`;
+}
+function getLanguageConventions(lang) {
+  return `${lang ?? "Unknown"}: Follow standard conventions`;
+}
+function createNewAgentFile(targetFile, templateFile, projectName, currentDate, currentBranch, lang, framework, projectType) {
+  if (!existsSync9(templateFile)) {
+    console.error(`ERROR: Template not found at ${templateFile}`);
+    process.exit(1 /* USER_ERROR */);
+  }
+  console.log("INFO: Creating new agent context file from template...");
+  let content = readFileSync4(templateFile, "utf-8");
+  let techStack = "";
+  let recentChange = "";
+  if (lang && framework) {
+    techStack = `- ${lang} + ${framework} (${currentBranch})`;
+    recentChange = `- ${currentBranch}: Added ${lang} + ${framework}`;
+  } else if (lang) {
+    techStack = `- ${lang} (${currentBranch})`;
+    recentChange = `- ${currentBranch}: Added ${lang}`;
+  } else if (framework) {
+    techStack = `- ${framework} (${currentBranch})`;
+    recentChange = `- ${currentBranch}: Added ${framework}`;
+  } else {
+    techStack = `- (${currentBranch})`;
+    recentChange = `- ${currentBranch}: Added`;
+  }
+  const projectStructure = getProjectStructure(projectType);
+  const commands = getCommandsForLanguage(lang);
+  const languageConventions = getLanguageConventions(lang);
+  content = content.replace(/\[PROJECT NAME\]/g, projectName);
+  content = content.replace(/\[DATE\]/g, currentDate);
+  content = content.replace(/\[EXTRACTED FROM ALL PLAN\.MD FILES\]/g, techStack);
+  content = content.replace(/\[ACTUAL STRUCTURE FROM PLANS\]/g, projectStructure);
+  content = content.replace(/\[ONLY COMMANDS FOR ACTIVE TECHNOLOGIES\]/g, commands);
+  content = content.replace(/\[LANGUAGE-SPECIFIC, ONLY FOR LANGUAGES IN USE\]/g, languageConventions);
+  content = content.replace(/\[LAST 3 FEATURES AND WHAT THEY ADDED\]/g, recentChange);
+  writeFileSync3(targetFile, content, "utf-8");
+  console.log(`\u2713 Created new agent context file`);
+}
+function updateExistingAgentFile(targetFile, currentDate, currentBranch, lang, framework, db) {
+  console.log("INFO: Updating existing agent context file...");
+  const content = readFileSync4(targetFile, "utf-8");
+  const lines = content.split(`
+`);
+  const output = [];
+  const techStack = formatTechnologyStack(lang, framework);
+  const newTechEntries = [];
+  let newChangeEntry = "";
+  if (techStack && !content.includes(techStack)) {
+    newTechEntries.push(`- ${techStack} (${currentBranch})`);
+  }
+  if (db && db !== "N/A" && db !== "NEEDS CLARIFICATION" && !content.includes(db)) {
+    newTechEntries.push(`- ${db} (${currentBranch})`);
+  }
+  if (techStack) {
+    newChangeEntry = `- ${currentBranch}: Added ${techStack}`;
+  } else if (db && db !== "N/A" && db !== "NEEDS CLARIFICATION") {
+    newChangeEntry = `- ${currentBranch}: Added ${db}`;
+  }
+  let inTechSection = false;
+  let inChangesSection = false;
+  let techEntriesAdded = false;
+  let existingChangesCount = 0;
+  for (let i = 0;i < lines.length; i++) {
+    const line = lines[i];
+    if (line === undefined)
+      continue;
+    if (line === "## Active Technologies") {
+      output.push(line);
+      inTechSection = true;
+      continue;
+    } else if (inTechSection && line.match(/^##\s/)) {
+      if (!techEntriesAdded && newTechEntries.length > 0) {
+        output.push(...newTechEntries);
+        techEntriesAdded = true;
+      }
+      output.push(line);
+      inTechSection = false;
+      continue;
+    } else if (inTechSection && line === "") {
+      if (!techEntriesAdded && newTechEntries.length > 0) {
+        output.push(...newTechEntries);
+        techEntriesAdded = true;
+      }
+      output.push(line);
+      continue;
+    }
+    if (line === "## Recent Changes") {
+      output.push(line);
+      if (newChangeEntry) {
+        output.push(newChangeEntry);
+      }
+      inChangesSection = true;
+      continue;
+    } else if (inChangesSection && line.match(/^##\s/)) {
+      output.push(line);
+      inChangesSection = false;
+      continue;
+    } else if (inChangesSection && line.startsWith("- ")) {
+      if (existingChangesCount < 2) {
+        output.push(line);
+        existingChangesCount++;
+      }
+      continue;
+    }
+    if (line.match(/\*\*Last updated\*\*:.*\d{4}-\d{2}-\d{2}/)) {
+      output.push(line.replace(/\d{4}-\d{2}-\d{2}/, currentDate));
+    } else {
+      output.push(line);
+    }
+  }
+  writeFileSync3(targetFile, output.join(`
+`), "utf-8");
+  console.log(`\u2713 Updated existing agent context file`);
+}
+function updateAgentFile(targetFile, agentName, repoRoot, currentBranch, lang, framework, db, projectType) {
+  console.log(`INFO: Updating ${agentName} context file: ${targetFile}`);
+  const projectName = path7.basename(repoRoot);
+  const currentDate = new Date().toISOString().split("T")[0];
+  const targetDir = path7.dirname(targetFile);
+  if (!existsSync9(targetDir)) {
+    mkdirSync5(targetDir, { recursive: true });
+  }
+  const templateFile = path7.join(getTemplatesDir(), "agent-file-template.md");
+  if (!existsSync9(targetFile)) {
+    createNewAgentFile(targetFile, templateFile, projectName, currentDate, currentBranch, lang, framework, projectType);
+  } else {
+    updateExistingAgentFile(targetFile, currentDate, currentBranch, lang, framework, db);
+  }
+}
+function updateSpecificAgent(agentType, agentPaths, repoRoot, currentBranch, lang, framework, db, projectType) {
+  const agentNames = {
+    claude: "Claude Code",
+    gemini: "Gemini CLI",
+    copilot: "GitHub Copilot",
+    "cursor-agent": "Cursor IDE",
+    qwen: "Qwen Code",
+    opencode: "opencode",
+    codex: "Codex CLI",
+    windsurf: "Windsurf",
+    kilocode: "Kilo Code",
+    auggie: "Auggie CLI",
+    roo: "Roo Code",
+    codebuddy: "CodeBuddy CLI",
+    amp: "Amp",
+    shai: "SHAI",
+    q: "Amazon Q Developer CLI"
+  };
+  if (!(agentType in agentPaths)) {
+    console.error(`ERROR: Unknown agent type '${agentType}'`);
+    console.error("Expected: claude|gemini|copilot|cursor-agent|qwen|opencode|codex|windsurf|kilocode|auggie|roo|amp|shai|q");
+    process.exit(1 /* USER_ERROR */);
+  }
+  const targetFile = agentPaths[agentType];
+  const agentName = agentNames[agentType];
+  updateAgentFile(targetFile, agentName, repoRoot, currentBranch, lang, framework, db, projectType);
+}
+function updateAllExistingAgents(agentPaths, repoRoot, currentBranch, lang, framework, db, projectType) {
+  let foundAgent = false;
+  const agentConfigs = [
+    { key: "claude", name: "Claude Code" },
+    { key: "gemini", name: "Gemini CLI" },
+    { key: "copilot", name: "GitHub Copilot" },
+    { key: "cursor-agent", name: "Cursor IDE" },
+    { key: "qwen", name: "Qwen Code" },
+    { key: "opencode", name: "Codex/opencode" },
+    { key: "windsurf", name: "Windsurf" },
+    { key: "kilocode", name: "Kilo Code" },
+    { key: "auggie", name: "Auggie CLI" },
+    { key: "roo", name: "Roo Code" },
+    { key: "codebuddy", name: "CodeBuddy CLI" },
+    { key: "shai", name: "SHAI" },
+    { key: "q", name: "Amazon Q Developer CLI" }
+  ];
+  for (const { key, name } of agentConfigs) {
+    const targetFile = agentPaths[key];
+    if (existsSync9(targetFile)) {
+      updateAgentFile(targetFile, name, repoRoot, currentBranch, lang, framework, db, projectType);
+      foundAgent = true;
+    }
+  }
+  if (!foundAgent) {
+    console.log("INFO: No existing agent files found, creating default Claude file...");
+    updateAgentFile(agentPaths.claude, "Claude Code", repoRoot, currentBranch, lang, framework, db, projectType);
+  }
+}
+function printSummary(lang, framework, db) {
+  console.log("");
+  console.log("INFO: Summary of changes:");
+  if (lang) {
+    console.log(`  - Added language: ${lang}`);
+  }
+  if (framework) {
+    console.log(`  - Added framework: ${framework}`);
+  }
+  if (db && db !== "N/A") {
+    console.log(`  - Added database: ${db}`);
+  }
+  console.log("");
+  console.log("INFO: Usage: update-agent-context [claude|gemini|copilot|cursor-agent|qwen|opencode|codex|windsurf|kilocode|auggie|codebuddy|shai|q]");
+}
+async function main6(args) {
+  const agentType = args[0] || "";
+  const paths = await getFeaturePaths();
+  if (!paths.CURRENT_BRANCH) {
+    console.error("ERROR: Unable to determine current feature");
+    if (paths.HAS_GIT === "true") {
+      console.log("INFO: Make sure you're on a feature branch");
+    } else {
+      console.log("INFO: Set SPECIFY_FEATURE environment variable or create a feature first");
+    }
+    return 1 /* USER_ERROR */;
+  }
+  if (!existsSync9(paths.IMPL_PLAN)) {
+    console.error(`ERROR: No plan.md found at ${paths.IMPL_PLAN}`);
+    console.log("INFO: Make sure you're working on a feature with a corresponding spec directory");
+    if (paths.HAS_GIT !== "true") {
+      console.log("INFO: Use: export SPECIFY_FEATURE=your-feature-name or create a new feature first");
+    }
+    return 1 /* USER_ERROR */;
+  }
+  console.log(`INFO: === Updating agent context files for feature ${paths.CURRENT_BRANCH} ===`);
+  const planData = parsePlanData(paths.IMPL_PLAN);
+  const agentPaths = getAgentFilePaths(paths.REPO_ROOT);
+  if (!agentType) {
+    console.log("INFO: No agent specified, updating all existing agent files...");
+    updateAllExistingAgents(agentPaths, paths.REPO_ROOT, paths.CURRENT_BRANCH, planData.lang, planData.framework, planData.db, planData.projectType);
+  } else {
+    console.log(`INFO: Updating specific agent: ${agentType}`);
+    updateSpecificAgent(agentType, agentPaths, paths.REPO_ROOT, paths.CURRENT_BRANCH, planData.lang, planData.framework, planData.db, planData.projectType);
+  }
+  printSummary(planData.lang, planData.framework, planData.db);
+  console.log("\u2713 Agent context update completed successfully");
+  return 0 /* SUCCESS */;
+}
+var init_update_agent_context = __esm(async () => {
+  init_paths();
+  init_cli_interface();
+  if (false) {}
+});
+
 // node_modules/commander/esm.mjs
 var import__ = __toESM(require_commander(), 1);
 var {
@@ -9138,7 +9470,7 @@ var {
 } = import__.default;
 
 // src/cli/index.ts
-import { readFileSync as readFileSync4, existsSync as existsSync9 } from "fs";
+import { readFileSync as readFileSync5, existsSync as existsSync10 } from "fs";
 import { join as join5, dirname as dirname3 } from "path";
 var lazyCheckPrerequisites = () => init_check_prerequisites().then(() => exports_check_prerequisites);
 var lazyCreateNewFeature = () => init_create_new_feature().then(() => exports_create_new_feature);
@@ -9146,6 +9478,7 @@ var lazyEnvCommand = () => init_env_command().then(() => exports_env_command);
 var lazyInitCommand = () => Promise.resolve().then(() => (init_init(), exports_init));
 var lazyLaunchIDECommand = () => Promise.resolve().then(() => (init_cli_launch_ide(), exports_cli_launch_ide));
 var lazySetupPlan = () => init_setup_plan().then(() => exports_setup_plan);
+var lazyUpdateAgentContext = () => init_update_agent_context().then(() => exports_update_agent_context);
 var globalState = {
   outputMode: "human"
 };
@@ -9157,8 +9490,8 @@ function getVersion() {
       join5(process.cwd(), "package.json")
     ];
     for (const pkgPath of possiblePaths) {
-      if (existsSync9(pkgPath)) {
-        const pkg = JSON.parse(readFileSync4(pkgPath, "utf-8"));
+      if (existsSync10(pkgPath)) {
+        const pkg = JSON.parse(readFileSync5(pkgPath, "utf-8"));
         if (pkg.version) {
           return pkg.version;
         }
@@ -9250,6 +9583,12 @@ function createProgram() {
     const exitCode = await module.main(args);
     process.exit(exitCode);
   });
+  program2.command("update-agent-context").description("Update agent-specific context files with technology stack").argument("[agent]", "Agent type (claude, gemini, copilot, cursor-agent, qwen, opencode, codex, windsurf, kilocode, auggie, roo, codebuddy, amp, shai, q)").option("--json", "Output in JSON format").action(async (agent, options) => {
+    const module = await lazyUpdateAgentContext();
+    const args = agent ? [agent, ...buildSubcommandArgs([], options)] : buildSubcommandArgs([], options);
+    const exitCode = await module.main(args);
+    process.exit(exitCode);
+  });
   program2.command("help [command]").description("Display help for command").action((cmdName) => {
     if (cmdName) {
       const cmd = program2.commands.find((c) => c.name() === cmdName);
@@ -9270,14 +9609,14 @@ function createProgram() {
   });
   return program2;
 }
-async function main6() {
+async function main7() {
   const program2 = createProgram();
   if (process.argv.length === 2) {
     program2.help();
   }
   await program2.parseAsync(process.argv);
 }
-main6().catch((error) => {
+main7().catch((error) => {
   const message = error instanceof Error ? error.message : String(error);
   console.error("Fatal error:", message);
   process.exit(1);
