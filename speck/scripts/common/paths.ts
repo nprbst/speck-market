@@ -227,7 +227,33 @@ export async function detectSpeckRoot(): Promise<SpeckConfig> {
   }
 
   const repoRoot = await getRepoRoot();
-  const symlinkPath = path.join(repoRoot, '.speck', 'root');
+
+  // T120: Handle worktree case - check main worktree's .speck/root symlink
+  // When running from a worktree, the worktree itself doesn't have .speck/root
+  // but the main repository (from which the worktree was created) might have it
+  let mainRepoRoot = repoRoot;
+  const gitPath = path.join(repoRoot, '.git');
+  try {
+    const gitStats = await fs.stat(gitPath);
+    if (gitStats.isFile()) {
+      // This is a worktree - .git is a file pointing to main repo's .git/worktrees/<name>
+      const gitContent = await fs.readFile(gitPath, 'utf-8');
+      const match = gitContent.match(/gitdir:\s*(.+)/);
+      if (match && match[1]) {
+        // Extract main repo from gitdir path (e.g., /path/to/main/.git/worktrees/feature-branch)
+        const gitDir = match[1].trim();
+        // Navigate up from .git/worktrees/xxx to get main repo root
+        // The path pattern is: <main-repo>/.git/worktrees/<worktree-name>
+        const worktreesDir = path.dirname(gitDir); // .git/worktrees
+        const gitDirPath = path.dirname(worktreesDir); // .git
+        mainRepoRoot = path.dirname(gitDirPath); // main repo root
+      }
+    }
+  } catch {
+    // If .git doesn't exist or can't be read, use repoRoot as-is
+  }
+
+  const symlinkPath = path.join(mainRepoRoot, '.speck', 'root');
 
   try {
     const stats = await fs.lstat(symlinkPath);

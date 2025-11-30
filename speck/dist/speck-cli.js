@@ -2213,7 +2213,22 @@ async function detectSpeckRoot() {
     return cachedConfig;
   }
   const repoRoot = await getRepoRoot();
-  const symlinkPath = path.join(repoRoot, ".speck", "root");
+  let mainRepoRoot = repoRoot;
+  const gitPath = path.join(repoRoot, ".git");
+  try {
+    const gitStats = await fs.stat(gitPath);
+    if (gitStats.isFile()) {
+      const gitContent = await fs.readFile(gitPath, "utf-8");
+      const match = gitContent.match(/gitdir:\s*(.+)/);
+      if (match && match[1]) {
+        const gitDir = match[1].trim();
+        const worktreesDir = path.dirname(gitDir);
+        const gitDirPath = path.dirname(worktreesDir);
+        mainRepoRoot = path.dirname(gitDirPath);
+      }
+    }
+  } catch {}
+  const symlinkPath = path.join(mainRepoRoot, ".speck", "root");
   try {
     const stats = await fs.lstat(symlinkPath);
     if (!stats.isSymbolicLink()) {
