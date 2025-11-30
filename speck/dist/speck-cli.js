@@ -7165,7 +7165,22 @@ var init_config_schema = __esm(() => {
       packageManager: "auto"
     },
     files: {
-      rules: [],
+      rules: [
+        { pattern: ".env*", action: "copy" },
+        { pattern: "*.config.js", action: "copy" },
+        { pattern: "*.config.ts", action: "copy" },
+        { pattern: "*.config.json", action: "copy" },
+        { pattern: ".nvmrc", action: "copy" },
+        { pattern: ".node-version", action: "copy" },
+        { pattern: ".claude/settings.local.json", action: "copy" },
+        { pattern: "node_modules", action: "symlink" },
+        { pattern: ".bun", action: "symlink" },
+        { pattern: ".cache", action: "symlink" },
+        { pattern: ".git", action: "ignore" },
+        { pattern: ".speck", action: "ignore" },
+        { pattern: "dist", action: "ignore" },
+        { pattern: "build", action: "ignore" }
+      ],
       includeUntracked: true
     }
   };

@@ -12,38 +12,6 @@ import { $ } from "bun";
 import type { FileRule } from "./config-schema";
 
 /**
- * Default file rules for worktree setup
- *
- * Based on plan.md recommendations:
- * - Copy config files that should be independent per worktree
- * - Symlink large directories that should be shared
- * - Ignore build artifacts and logs
- */
-export const DEFAULT_FILE_RULES: FileRule[] = [
-  // Configuration files (copy for independence)
-  { pattern: "package.json", action: "copy" },
-  { pattern: "package-lock.json", action: "copy" },
-  { pattern: "yarn.lock", action: "copy" },
-  { pattern: "pnpm-lock.yaml", action: "copy" },
-  { pattern: "bun.lockb", action: "copy" },
-  { pattern: "*.config.js", action: "copy" },
-  { pattern: "*.config.ts", action: "copy" },
-  { pattern: "tsconfig.json", action: "copy" },
-  { pattern: ".gitignore", action: "copy" },
-  { pattern: ".env.example", action: "copy" },
-
-  // Dependencies (symlink for disk space efficiency)
-  { pattern: "node_modules", action: "symlink" },
-  { pattern: ".git", action: "symlink" },
-
-  // Build artifacts (ignore)
-  { pattern: "dist/**", action: "ignore" },
-  { pattern: "build/**", action: "ignore" },
-  { pattern: "*.log", action: "ignore" },
-  { pattern: ".DS_Store", action: "ignore" },
-];
-
-/**
  * Options for file operations
  */
 export interface ApplyFileRulesOptions {

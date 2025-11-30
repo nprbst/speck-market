@@ -112,32 +112,10 @@ export type SpeckConfig = z.infer<typeof SpeckConfigSchema>;
 // ============================================================================
 
 /**
- * Default file rules applied when user has not configured custom rules.
- * These provide sensible defaults for most TypeScript/JavaScript projects.
- */
-export const DEFAULT_FILE_RULES: FileRule[] = [
-  // Copy configuration files (isolation)
-  { pattern: ".env*", action: "copy" },
-  { pattern: "*.config.js", action: "copy" },
-  { pattern: "*.config.ts", action: "copy" },
-  { pattern: "*.config.json", action: "copy" },
-  { pattern: ".nvmrc", action: "copy" },
-  { pattern: ".node-version", action: "copy" },
-
-  // Symlink large dependency directories (if they exist in parent)
-  { pattern: "node_modules", action: "symlink" },
-  { pattern: ".bun", action: "symlink" },
-  { pattern: ".cache", action: "symlink" },
-
-  // Ignore (don't copy or symlink)
-  { pattern: ".git", action: "ignore" },
-  { pattern: ".speck", action: "ignore" },
-  { pattern: "dist", action: "ignore" },
-  { pattern: "build", action: "ignore" },
-];
-
-/**
  * Default worktree configuration (worktree enabled by default)
+ *
+ * File rules are included directly so they appear in generated config.json,
+ * making them visible and editable by users.
  */
 export const DEFAULT_WORKTREE_CONFIG: WorktreeConfig = {
   enabled: true,
@@ -152,7 +130,28 @@ export const DEFAULT_WORKTREE_CONFIG: WorktreeConfig = {
     packageManager: "auto",
   },
   files: {
-    rules: [],
+    rules: [
+      // Copy configuration files (isolation per worktree)
+      { pattern: ".env*", action: "copy" },
+      { pattern: "*.config.js", action: "copy" },
+      { pattern: "*.config.ts", action: "copy" },
+      { pattern: "*.config.json", action: "copy" },
+      { pattern: ".nvmrc", action: "copy" },
+      { pattern: ".node-version", action: "copy" },
+      // Claude Code local settings (untracked, machine-specific)
+      { pattern: ".claude/settings.local.json", action: "copy" },
+
+      // Symlink large dependency directories (shared across worktrees)
+      { pattern: "node_modules", action: "symlink" },
+      { pattern: ".bun", action: "symlink" },
+      { pattern: ".cache", action: "symlink" },
+
+      // Ignore (don't copy or symlink - handled by git or not needed)
+      { pattern: ".git", action: "ignore" },
+      { pattern: ".speck", action: "ignore" },
+      { pattern: "dist", action: "ignore" },
+      { pattern: "build", action: "ignore" },
+    ],
     includeUntracked: true,
   },
 };
@@ -271,12 +270,11 @@ export function isWorktreeEnabled(config: SpeckConfig): boolean {
 }
 
 /**
- * Get file rules with defaults applied
+ * Get file rules from configuration
  *
  * @param config - Speck configuration
- * @returns Array of file rules (custom or defaults)
+ * @returns Array of file rules
  */
 export function getFileRules(config: SpeckConfig): FileRule[] {
-  const customRules = config.worktree?.files?.rules ?? [];
-  return customRules.length > 0 ? customRules : DEFAULT_FILE_RULES;
+  return config.worktree?.files?.rules ?? [];
 }
