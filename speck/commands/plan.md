@@ -140,7 +140,15 @@ Parse command-line flags from user input:
    - Use standard REST/GraphQL patterns
    - **Write to**: `{FEATURE_DIR}/contracts/` (shared - goes to root repo, accessible to all child repos)
 
-3. **Agent context update**:
+3. **Generate quickstart.md** with developer setup instructions:
+   - Prerequisites (runtime versions, dependencies)
+   - Installation steps
+   - Development commands (start, test, build)
+   - Project structure overview
+   - Common tasks and workflows
+   - **Write to**: `{REPO_ROOT}/specs/{feature}/quickstart.md` (local to child repo)
+
+4. **Agent context update**:
    - Run `speck update-agent-context`
    - These scripts detect which AI agent is in use
    - Update the appropriate agent-specific context file
