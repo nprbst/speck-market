@@ -220,7 +220,7 @@ Given that feature description, do this:
 8. **[SPECK-EXTENSION] Deferred IDE Launch** (Only if worktree was created in step 2f):
    - Check if WORKTREE_PATH was returned by create-new-feature (indicates worktree mode was used)
    - If WORKTREE_PATH exists AND user did NOT pass `--no-ide` flag:
-     1. Run: `bun .speck/scripts/worktree/cli.ts launch-ide --worktree-path "$WORKTREE_PATH"`
+     1. Run: `speck launch-ide --worktree-path "$WORKTREE_PATH"`
      2. If launch succeeds: Report "✓ Launched IDE at [WORKTREE_PATH]"
      3. If launch fails (non-fatal): Report "⚠ IDE launch failed: [error]"
    - This ensures the IDE opens AFTER the spec and checklists are fully written, allowing the handoff to work correctly

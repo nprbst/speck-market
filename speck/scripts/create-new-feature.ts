@@ -61,6 +61,7 @@ interface CreateFeatureOptions {
   localSpec: boolean;   // T067: Create spec locally in child repo
   noWorktree: boolean;  // T053: Disable worktree creation even if config enables it
   worktree: boolean;    // Force worktree creation even if config disables it
+  noIde: boolean;       // Skip IDE launch (for deferred launch by /speck.specify)
   help: boolean;
   featureDescription: string;
 }
@@ -94,6 +95,7 @@ function parseArgs(args: string[]): ParseResult {
     localSpec: false,
     noWorktree: false,
     worktree: false,
+    noIde: false,
     help: false,
     featureDescription: "",
   };
@@ -145,6 +147,9 @@ function parseArgs(args: string[]): ParseResult {
     } else if (arg === "--worktree") {
       options.worktree = true;
       i++;
+    } else if (arg === "--no-ide") {
+      options.noIde = true;
+      i++;
     } else if (arg === "--help" || arg === "-h") {
       options.help = true;
       i++;
@@ -163,7 +168,7 @@ function parseArgs(args: string[]): ParseResult {
  */
 function showHelp(): void {
   const scriptName = path.basename(process.argv[1]!);
-  console.log(`Usage: ${scriptName} [--json] [--hook] [--short-name <name>] [--number N] [--branch <name>] [--shared-spec | --local-spec] [--worktree | --no-worktree] <feature_description>
+  console.log(`Usage: ${scriptName} [--json] [--hook] [--short-name <name>] [--number N] [--branch <name>] [--shared-spec | --local-spec] [--worktree | --no-worktree] [--no-ide] <feature_description>
 
 Options:
   --json              Output in JSON format (structured JSON envelope)
@@ -175,6 +180,7 @@ Options:
   --local-spec        Create spec locally in child repo (single-repo or child-only spec)
   --worktree          Create a worktree with handoff artifacts (overrides config)
   --no-worktree       Disable worktree creation (overrides config)
+  --no-ide            Skip IDE launch (for deferred launch by /speck.specify)
   --help, -h          Show this help message
 
 Worktree Mode:
@@ -624,8 +630,8 @@ export async function main(args: string[]): Promise<number> {
           }
         }
 
-        // Launch IDE in worktree if configured
-        if (worktreeConfig.worktree.ide.autoLaunch) {
+        // Launch IDE in worktree if configured (skip if --no-ide flag passed)
+        if (worktreeConfig.worktree.ide.autoLaunch && !options.noIde) {
           try {
             const ideResult = launchIDE({
               worktreePath,

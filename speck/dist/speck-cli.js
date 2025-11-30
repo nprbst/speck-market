@@ -7391,12 +7391,14 @@ var init_handoff = __esm(() => {
       {
         label: "Start Claude with Handoff",
         type: "shell",
-        command: "${env:SHELL}",
-        args: [
-          "-l",
-          "-c",
-          "claude 'Read .speck/handoff.md and proceed with the task described there.'"
-        ],
+        command: "claude",
+        args: ["Read .speck/handoff.md and proceed with the task described there."],
+        options: {
+          shell: {
+            executable: "${env:SHELL}",
+            args: ["-l", "-c"]
+          }
+        },
         runOptions: {
           runOn: "folderOpen"
         },
@@ -7688,6 +7690,7 @@ function parseArgs2(args) {
     localSpec: false,
     noWorktree: false,
     worktree: false,
+    noIde: false,
     help: false,
     featureDescription: ""
   };
@@ -7735,6 +7738,9 @@ function parseArgs2(args) {
     } else if (arg === "--worktree") {
       options.worktree = true;
       i++;
+    } else if (arg === "--no-ide") {
+      options.noIde = true;
+      i++;
     } else if (arg === "--help" || arg === "-h") {
       options.help = true;
       i++;
@@ -7748,7 +7754,7 @@ function parseArgs2(args) {
 }
 function showHelp2() {
   const scriptName = path4.basename(process.argv[1]);
-  console.log(`Usage: ${scriptName} [--json] [--hook] [--short-name <name>] [--number N] [--branch <name>] [--shared-spec | --local-spec] [--worktree | --no-worktree] <feature_description>
+  console.log(`Usage: ${scriptName} [--json] [--hook] [--short-name <name>] [--number N] [--branch <name>] [--shared-spec | --local-spec] [--worktree | --no-worktree] [--no-ide] <feature_description>
 
 Options:
   --json              Output in JSON format (structured JSON envelope)
@@ -7760,6 +7766,7 @@ Options:
   --local-spec        Create spec locally in child repo (single-repo or child-only spec)
   --worktree          Create a worktree with handoff artifacts (overrides config)
   --no-worktree       Disable worktree creation (overrides config)
+  --no-ide            Skip IDE launch (for deferred launch by /speck.specify)
   --help, -h          Show this help message
 
 Worktree Mode:
@@ -8104,7 +8111,7 @@ async function main2(args) {
             console.error(`[speck] Warning: Failed to write handoff artifacts: ${errorMessage}`);
           }
         }
-        if (worktreeConfig.worktree.ide.autoLaunch) {
+        if (worktreeConfig.worktree.ide.autoLaunch && !options.noIde) {
           try {
             const ideResult = launchIDE({
               worktreePath,
@@ -8952,6 +8959,61 @@ var init_init = __esm(() => {
   if (false) {}
 });
 
+// .speck/scripts/worktree/cli-launch-ide.ts
+var exports_cli_launch_ide = {};
+__export(exports_cli_launch_ide, {
+  executeLaunchIDECommand: () => executeLaunchIDECommand
+});
+async function executeLaunchIDECommand(options) {
+  const { worktreePath, repoPath = ".", json = false } = options;
+  try {
+    const config = await loadConfig(repoPath);
+    if (!config.worktree?.ide?.autoLaunch) {
+      if (json) {
+        console.log(JSON.stringify({
+          success: true,
+          skipped: true,
+          message: "IDE auto-launch is disabled in configuration"
+        }));
+      }
+      return;
+    }
+    const result = launchIDE({
+      worktreePath,
+      editor: config.worktree.ide.editor,
+      newWindow: config.worktree.ide.newWindow
+    });
+    if (json) {
+      console.log(JSON.stringify({
+        success: result.success,
+        editor: result.editor,
+        command: result.command,
+        error: result.error
+      }));
+    } else {
+      if (result.success) {
+        console.log(`\u2713 Launched ${result.editor} at ${worktreePath}`);
+      } else {
+        console.error(`\u26A0 IDE launch failed: ${result.error}`);
+      }
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    if (json) {
+      console.log(JSON.stringify({
+        success: false,
+        error: errorMessage
+      }));
+    } else {
+      console.error(`\u26A0 Error: ${errorMessage}`);
+    }
+  }
+}
+var init_cli_launch_ide = __esm(() => {
+  init_config();
+  init_ide_launch();
+});
+
 // node_modules/commander/esm.mjs
 var import__ = __toESM(require_commander(), 1);
 var {
@@ -8975,6 +9037,7 @@ var lazyCheckPrerequisites = () => init_check_prerequisites().then(() => exports
 var lazyCreateNewFeature = () => init_create_new_feature().then(() => exports_create_new_feature);
 var lazyEnvCommand = () => init_env_command().then(() => exports_env_command);
 var lazyInitCommand = () => Promise.resolve().then(() => (init_init(), exports_init));
+var lazyLaunchIDECommand = () => Promise.resolve().then(() => (init_cli_launch_ide(), exports_cli_launch_ide));
 var globalState = {
   outputMode: "human"
 };
@@ -9064,6 +9127,14 @@ function createProgram() {
     const args = buildSubcommandArgs([], options);
     const exitCode = await module.main(args);
     process.exit(exitCode);
+  });
+  program2.command("launch-ide").description("Launch IDE in worktree (for deferred IDE launch)").requiredOption("--worktree-path <path>", "Path to worktree directory").option("--repo-path <path>", "Path to repository root for config (default: .)").option("--json", "Output as JSON").action(async (options) => {
+    const module = await lazyLaunchIDECommand();
+    await module.executeLaunchIDECommand({
+      worktreePath: options.worktreePath,
+      repoPath: options.repoPath || ".",
+      json: options.json === true
+    });
   });
   program2.command("help [command]").description("Display help for command").action((cmdName) => {
     if (cmdName) {
