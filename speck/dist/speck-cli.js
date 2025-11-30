@@ -9008,6 +9008,116 @@ var init_cli_launch_ide = __esm(() => {
   init_ide_launch();
 });
 
+// .speck/scripts/setup-plan.ts
+var exports_setup_plan = {};
+__export(exports_setup_plan, {
+  main: () => main5
+});
+import { existsSync as existsSync8, mkdirSync as mkdirSync4, copyFileSync as copyFileSync2 } from "fs";
+import path6 from "path";
+var {$: $5 } = globalThis.Bun;
+function parseArgs4(args) {
+  return {
+    json: args.includes("--json"),
+    help: args.includes("--help") || args.includes("-h")
+  };
+}
+function showHelp4() {
+  console.log(`Usage: setup-plan [--json]
+  --json    Output results in JSON format
+  --help    Show this help message`);
+}
+async function main5(args) {
+  const options = parseArgs4(args);
+  if (options.help) {
+    showHelp4();
+    return 0 /* SUCCESS */;
+  }
+  const paths = await getFeaturePaths();
+  const hasGitRepo = paths.HAS_GIT === "true";
+  if (!await checkFeatureBranch(paths.CURRENT_BRANCH, hasGitRepo, paths.REPO_ROOT)) {
+    return 1 /* USER_ERROR */;
+  }
+  mkdirSync4(paths.FEATURE_DIR, { recursive: true });
+  const branchName = paths.CURRENT_BRANCH;
+  const config = await detectSpeckRoot();
+  if (hasGitRepo) {
+    try {
+      const currentBranch = await $5`git rev-parse --abbrev-ref HEAD`.quiet();
+      const currentBranchName = currentBranch.text().trim();
+      if (currentBranchName !== branchName) {
+        try {
+          await $5`git checkout ${branchName}`.quiet();
+          console.log(`[specify] Checked out branch: ${branchName}`);
+        } catch {
+          await $5`git checkout -b ${branchName}`.quiet();
+          console.log(`[specify] Created and checked out branch: ${branchName}`);
+        }
+      }
+    } catch (error) {
+      console.error(`[specify] Warning: Could not manage git branch: ${String(error)}`);
+    }
+    const specFile = paths.FEATURE_SPEC;
+    const isSharedSpec = config.mode === "multi-repo" && existsSync8(specFile);
+    if (isSharedSpec) {
+      const parentRepoRoot = config.speckRoot;
+      let parentHasGit = false;
+      try {
+        const result = await $5`git -C ${parentRepoRoot} rev-parse --git-dir`.quiet();
+        if (result.exitCode === 0) {
+          parentHasGit = true;
+        }
+      } catch {}
+      if (parentHasGit) {
+        try {
+          const parentBranch = await $5`git -C ${parentRepoRoot} rev-parse --abbrev-ref HEAD`.quiet();
+          const parentBranchName = parentBranch.text().trim();
+          if (parentBranchName !== branchName) {
+            console.error(`[specify] Warning: Parent repo branch mismatch!`);
+            console.error(`[specify]   Child repo (current): ${branchName}`);
+            console.error(`[specify]   Parent repo: ${parentBranchName}`);
+            console.error(`[specify]   Parent location: ${parentRepoRoot}`);
+            console.error(`[specify] Consider checking out matching branch in parent:`);
+            console.error(`[specify]   git -C ${parentRepoRoot} checkout ${branchName}`);
+          }
+        } catch (error) {
+          console.error(`[specify] Warning: Could not check parent repo branch: ${String(error)}`);
+        }
+      }
+    }
+  }
+  const template = path6.join(getTemplatesDir(), "plan-template.md");
+  if (existsSync8(template)) {
+    copyFileSync2(template, paths.IMPL_PLAN);
+    console.log(`Copied plan template to ${paths.IMPL_PLAN}`);
+  } else {
+    console.log(`Warning: Plan template not found at ${template}`);
+    await Bun.write(paths.IMPL_PLAN, "");
+  }
+  if (options.json) {
+    const output = {
+      FEATURE_SPEC: paths.FEATURE_SPEC,
+      IMPL_PLAN: paths.IMPL_PLAN,
+      SPECS_DIR: paths.FEATURE_DIR,
+      BRANCH: paths.CURRENT_BRANCH,
+      HAS_GIT: paths.HAS_GIT
+    };
+    console.log(JSON.stringify(output));
+  } else {
+    console.log(`FEATURE_SPEC: ${paths.FEATURE_SPEC}`);
+    console.log(`IMPL_PLAN: ${paths.IMPL_PLAN}`);
+    console.log(`SPECS_DIR: ${paths.FEATURE_DIR}`);
+    console.log(`BRANCH: ${paths.CURRENT_BRANCH}`);
+    console.log(`HAS_GIT: ${paths.HAS_GIT}`);
+  }
+  return 0 /* SUCCESS */;
+}
+var init_setup_plan = __esm(async () => {
+  init_paths();
+  init_cli_interface();
+  if (false) {}
+});
+
 // node_modules/commander/esm.mjs
 var import__ = __toESM(require_commander(), 1);
 var {
@@ -9025,13 +9135,14 @@ var {
 } = import__.default;
 
 // src/cli/index.ts
-import { readFileSync as readFileSync4, existsSync as existsSync8 } from "fs";
+import { readFileSync as readFileSync4, existsSync as existsSync9 } from "fs";
 import { join as join5, dirname as dirname3 } from "path";
 var lazyCheckPrerequisites = () => init_check_prerequisites().then(() => exports_check_prerequisites);
 var lazyCreateNewFeature = () => init_create_new_feature().then(() => exports_create_new_feature);
 var lazyEnvCommand = () => init_env_command().then(() => exports_env_command);
 var lazyInitCommand = () => Promise.resolve().then(() => (init_init(), exports_init));
 var lazyLaunchIDECommand = () => Promise.resolve().then(() => (init_cli_launch_ide(), exports_cli_launch_ide));
+var lazySetupPlan = () => init_setup_plan().then(() => exports_setup_plan);
 var globalState = {
   outputMode: "human"
 };
@@ -9043,7 +9154,7 @@ function getVersion() {
       join5(process.cwd(), "package.json")
     ];
     for (const pkgPath of possiblePaths) {
-      if (existsSync8(pkgPath)) {
+      if (existsSync9(pkgPath)) {
         const pkg = JSON.parse(readFileSync4(pkgPath, "utf-8"));
         if (pkg.version) {
           return pkg.version;
@@ -9130,6 +9241,12 @@ function createProgram() {
       json: options.json === true
     });
   });
+  program2.command("setup-plan").description("Set up plan.md for the current feature").option("--json", "Output in JSON format").action(async (options) => {
+    const module = await lazySetupPlan();
+    const args = buildSubcommandArgs([], options);
+    const exitCode = await module.main(args);
+    process.exit(exitCode);
+  });
   program2.command("help [command]").description("Display help for command").action((cmdName) => {
     if (cmdName) {
       const cmd = program2.commands.find((c) => c.name() === cmdName);
@@ -9150,14 +9267,14 @@ function createProgram() {
   });
   return program2;
 }
-async function main5() {
+async function main6() {
   const program2 = createProgram();
   if (process.argv.length === 2) {
     program2.help();
   }
   await program2.parseAsync(process.argv);
 }
-main5().catch((error) => {
+main6().catch((error) => {
   const message = error instanceof Error ? error.message : String(error);
   console.error("Fatal error:", message);
   process.exit(1);

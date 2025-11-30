@@ -46,7 +46,7 @@ Parse command-line flags from user input:
 
    **Fallback**: If the comment is not present (VSCode hook bug), run:
    ```bash
-   speck-setup-plan --json
+   speck setup-plan --json
    ```
    Parse JSON for FEATURE_SPEC, IMPL_PLAN, SPECS_DIR, BRANCH.
 
