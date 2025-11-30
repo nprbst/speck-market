@@ -7391,8 +7391,12 @@ var init_handoff = __esm(() => {
       {
         label: "Start Claude with Handoff",
         type: "shell",
-        command: "claude",
-        args: ["Read .speck/handoff.md and proceed with the task described there."],
+        command: "${env:SHELL}",
+        args: [
+          "-l",
+          "-c",
+          "claude 'Read .speck/handoff.md and proceed with the task described there.'"
+        ],
         runOptions: {
           runOn: "folderOpen"
         },

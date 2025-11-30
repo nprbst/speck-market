@@ -68,11 +68,12 @@ Given that feature description, do this:
       - If `MODE` is `"single-repo"`:
         - Set `SPEC_LOCATION = "local"` (no prompt needed)
 
-   f. Run the command `speck create-new-feature --json "$ARGUMENTS"` with the calculated number and short-name:
+   f. Run the command `speck create-new-feature --json --no-ide "$ARGUMENTS"` with the calculated number and short-name:
       - Pass `--number N+1` and `--short-name "your-short-name"` along with the feature description
+      - **ALWAYS include `--no-ide`** to defer IDE launch until after spec is fully written
       - **If multi-repo mode and user chose "parent"**: Add `--shared-spec` flag
       - **If multi-repo mode and user chose "local"**: Add `--local-spec` flag (or omit flag - local is default)
-      - Bash example: `speck create-new-feature --json --number 5 --short-name "user-auth" --shared-spec "Add user authentication"`
+      - Bash example: `speck create-new-feature --json --no-ide --number 5 --short-name "user-auth" --shared-spec "Add user authentication"`
 
    **IMPORTANT**:
    - First find the highest number across ALL specs/branches to determine the baseline
@@ -84,25 +85,11 @@ Given that feature description, do this:
    - The JSON output will contain BRANCH_NAME, SPEC_FILE, and optionally WORKTREE_PATH
    - **CRITICAL**: The SPEC_FILE path is an **absolute path** - use it exactly as returned. In worktree mode, SPEC_FILE points to the worktree's specs/ directory (NOT the main repo).
    - For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\''m Groot' (or double-quote if possible: "I'm Groot")
-
-   g. **[SPECK-EXTENSION] Worktree Integration** (Optional - enabled when worktree.enabled = true in .speck/config.json):
-      - **Check worktree configuration**: Load .speck/config.json and check if `worktree.enabled` is true
-      - **If worktree integration is enabled**:
-        1. Run: `bun .speck/scripts/worktree/create.ts --branch "$BRANCH_NAME" --repo-path "$(pwd)"`
-        2. If creation succeeds:
-           - Report: "✓ Created worktree at [path]"
-           - If IDE auto-launch is enabled, report: "✓ Launched [IDE name]"
-        3. If creation fails (non-fatal):
-           - Report warning: "⚠ Worktree creation failed: [error]"
-           - Continue with spec generation (worktree is optional)
-      - **If worktree integration is disabled**:
-        - Skip worktree creation silently
-        - Branch is checked out in main repository (standard Git workflow)
-      - **Flag support** (override config):
-        - If user passed `--no-worktree` flag: Skip worktree creation even if enabled in config
-        - If user passed `--worktree` flag: Create worktree even if disabled in config
-        - If user passed `--no-ide` flag: Pass `--no-ide` to worktree creation to skip IDE launch
-        - If user passed `--no-deps` flag: Pass `--no-deps` to worktree creation to skip dependency installation
+   - **Worktree mode**: If worktree.enabled is true in config, create-new-feature will create the worktree and write handoff artifacts, but NOT launch IDE yet (deferred to step 8)
+   - **Flag support** (override config):
+     - If user passed `--no-worktree` flag: Also pass it to create-new-feature to skip worktree creation
+     - If user passed `--worktree` flag: Also pass it to force worktree creation
+     - If user passed `--no-deps` flag: Also pass it to skip dependency installation
 
 3. Load `${CLAUDE_PLUGIN_ROOT}/templates/spec-template.md` to understand required sections.
 
@@ -229,6 +216,14 @@ Given that feature description, do this:
    d. **Update Checklist**: After each validation iteration, update the checklist file with current pass/fail status
 
 7. Report completion with branch name, spec file path, checklist results, and readiness for the next phase (`/speck:clarify` or `/speck:plan`).
+
+8. **[SPECK-EXTENSION] Deferred IDE Launch** (Only if worktree was created in step 2f):
+   - Check if WORKTREE_PATH was returned by create-new-feature (indicates worktree mode was used)
+   - If WORKTREE_PATH exists AND user did NOT pass `--no-ide` flag:
+     1. Run: `bun .speck/scripts/worktree/cli.ts launch-ide --worktree-path "$WORKTREE_PATH"`
+     2. If launch succeeds: Report "✓ Launched IDE at [WORKTREE_PATH]"
+     3. If launch fails (non-fatal): Report "⚠ IDE launch failed: [error]"
+   - This ensures the IDE opens AFTER the spec and checklists are fully written, allowing the handoff to work correctly
 
 **NOTE:** The script creates and checks out the new branch and initializes the spec file before writing.
 
