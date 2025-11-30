@@ -2584,7 +2584,7 @@ async function getFeaturePaths() {
     RESEARCH: path.join(localSpecsDir, "research.md"),
     DATA_MODEL: path.join(localSpecsDir, "data-model.md"),
     QUICKSTART: path.join(localSpecsDir, "quickstart.md"),
-    CONTRACTS_DIR: path.join(localSpecsDir, "contracts")
+    CONTRACTS_DIR: path.join(featureDir, "contracts")
   };
 }
 async function getDefaultWorkflowMode() {

@@ -114,7 +114,7 @@ Parse command-line flags from user input:
    - Decision: [what was chosen]
    - Rationale: [why chosen]
    - Alternatives considered: [what else evaluated]
-   - **Write to**: `{FEATURE_DIR}/research.md` (shared artifact, goes to root in multi-repo)
+   - **Write to**: `{REPO_ROOT}/specs/{feature}/research.md` (local to child repo - each repo does its own research)
 
 **Output**: research.md with all NEEDS CLARIFICATION resolved
 
@@ -122,16 +122,23 @@ Parse command-line flags from user input:
 
 **Prerequisites:** `research.md` complete
 
+**Before generating contracts**: Check for existing shared contracts
+1. If `{FEATURE_DIR}/contracts/` exists and contains files:
+   - Read all contract files in that directory
+   - Use these as constraints for planning (the API is already defined)
+   - Do NOT regenerate contracts - skip to step 3
+2. If no contracts exist, proceed to generate them below
+
 1. **Extract entities from feature spec** → `data-model.md`:
    - Entity name, fields, relationships
    - Validation rules from requirements
    - State transitions if applicable
-   - **Write to**: `{FEATURE_DIR}/data-model.md` (shared artifact, goes to root in multi-repo)
+   - **Write to**: `{REPO_ROOT}/specs/{feature}/data-model.md` (local to child repo - each repo has its own data model)
 
-2. **Generate API contracts** from functional requirements:
+2. **Generate API contracts** from functional requirements (only if no shared contracts exist):
    - For each user action → endpoint
    - Use standard REST/GraphQL patterns
-   - **Write to**: `{FEATURE_DIR}/contracts/` (shared artifacts, go to root in multi-repo)
+   - **Write to**: `{FEATURE_DIR}/contracts/` (shared - goes to root repo, accessible to all child repos)
 
 3. **Agent context update**:
    - Run `speck update-agent-context`
@@ -140,7 +147,7 @@ Parse command-line flags from user input:
    - Add only new technology from current plan
    - Preserve manual additions between markers
 
-**Output**: data-model.md, /contracts/*, quickstart.md (all in FEATURE_DIR - shared), agent-specific file
+**Output**: data-model.md (local), contracts/* (shared, if created), quickstart.md (local), agent-specific file
 
 ## Key rules
 

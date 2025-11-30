@@ -857,7 +857,7 @@ export async function getFeaturePaths(): Promise<FeaturePaths> {
     RESEARCH: path.join(localSpecsDir, "research.md"),  // Local (child repo)
     DATA_MODEL: path.join(localSpecsDir, "data-model.md"),  // Local (child repo)
     QUICKSTART: path.join(localSpecsDir, "quickstart.md"),  // Local (child repo)
-    CONTRACTS_DIR: path.join(localSpecsDir, "contracts"),  // Local (child repo)
+    CONTRACTS_DIR: path.join(featureDir, "contracts"),  // Shared (root repo) - API contracts shared across repos
   };
   // [SPECK-EXTENSION:END]
 }
