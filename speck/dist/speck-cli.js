@@ -7139,7 +7139,7 @@ var init_config_schema = __esm(() => {
   }).default({});
   WorktreeConfigSchema = exports_external.object({
     enabled: exports_external.boolean().default(true),
-    worktreePath: exports_external.string().default(".speck/worktrees"),
+    worktreePath: exports_external.string().default("../"),
     branchPrefix: exports_external.string().optional(),
     ide: IDEConfigSchema,
     dependencies: DependencyConfigSchema,
@@ -7151,7 +7151,7 @@ var init_config_schema = __esm(() => {
   });
   DEFAULT_WORKTREE_CONFIG = {
     enabled: true,
-    worktreePath: ".speck/worktrees",
+    worktreePath: "../",
     ide: {
       autoLaunch: false,
       editor: "vscode",
