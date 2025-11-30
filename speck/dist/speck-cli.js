@@ -8121,7 +8121,7 @@ async function main2(args) {
     }
     specId = branchName;
   }
-  if (isNonStandardBranch && hasGit2) {
+  if (hasGit2) {
     try {
       const branchMapping = await readBranches(repoRoot);
       const entry = createBranchEntry(branchName, specId);

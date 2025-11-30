@@ -74,6 +74,7 @@ Given that feature description, do this:
       - **If multi-repo mode and user chose "parent"**: Add `--shared-spec` flag
       - **If multi-repo mode and user chose "local"**: Add `--local-spec` flag (or omit flag - local is default)
       - Bash example: `speck create-new-feature --json --no-ide --number 5 --short-name "user-auth" --shared-spec "Add user authentication"`
+      - With custom branch: `speck create-new-feature --json --no-ide --number 5 --short-name "user-auth" --branch "feature/user-auth" "Add user authentication"`
 
    **IMPORTANT**:
    - First find the highest number across ALL specs/branches to determine the baseline
@@ -87,6 +88,7 @@ Given that feature description, do this:
    - For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\''m Groot' (or double-quote if possible: "I'm Groot")
    - **Worktree mode**: If worktree.enabled is true in config, create-new-feature will create the worktree and write handoff artifacts, but NOT launch IDE yet (deferred to step 8)
    - **Flag support** (override config):
+     - If user passed `--branch <name>` flag: Also pass it to create-new-feature to use a custom branch name
      - If user passed `--no-worktree` flag: Also pass it to create-new-feature to skip worktree creation
      - If user passed `--worktree` flag: Also pass it to force worktree creation
      - If user passed `--no-deps` flag: Also pass it to skip dependency installation

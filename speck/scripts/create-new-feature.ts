@@ -544,8 +544,8 @@ export async function main(args: string[]): Promise<number> {
     specId = branchName; // For standard branches, spec ID equals branch name
   }
 
-  // T081: Record non-standard branch name in branches.json
-  if (isNonStandardBranch && hasGit) {
+  // Record branch mapping in branches.json (always, for complete tracking)
+  if (hasGit) {
     try {
       const branchMapping = await readBranches(repoRoot);
       const entry = createBranchEntry(branchName, specId);
