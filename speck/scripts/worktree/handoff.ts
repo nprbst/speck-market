@@ -91,22 +91,14 @@ export const VSCODE_TASKS_PATH = ".vscode/tasks.json";
 // =============================================================================
 
 /**
- * Claude settings.json template with SessionStart hook configuration
+ * Claude settings.json template
+ *
+ * NOTE: SessionStart hook disabled to avoid race condition with VSCode task.
+ * The VSCode task launches Claude with an initial prompt that reads handoff.md,
+ * but the hook would rename the file to .done.md before Claude could read it.
  */
 export const CLAUDE_SETTINGS_TEMPLATE = {
-  hooks: {
-    SessionStart: [
-      {
-        matcher: "",
-        hooks: [
-          {
-            type: "command",
-            command: "$CLAUDE_PROJECT_DIR/.claude/scripts/handoff.sh",
-          },
-        ],
-      },
-    ],
-  },
+  hooks: {},
 };
 
 /**

@@ -7404,19 +7404,7 @@ var init_handoff = __esm(() => {
     nextStep: exports_external.string().min(1, "Next step is required")
   });
   CLAUDE_SETTINGS_TEMPLATE = {
-    hooks: {
-      SessionStart: [
-        {
-          matcher: "",
-          hooks: [
-            {
-              type: "command",
-              command: "$CLAUDE_PROJECT_DIR/.claude/scripts/handoff.sh"
-            }
-          ]
-        }
-      ]
-    }
+    hooks: {}
   };
   VSCODE_TASKS_TEMPLATE = {
     version: "2.0.0",
