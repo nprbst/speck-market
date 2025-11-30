@@ -102,7 +102,7 @@ This command supports the following flags for branch-aware task generation (US4)
    - Create parallel execution examples per user story
    - Validate task completeness (each user story has all needed tasks, independently testable)
 
-5. **Generate tasks.md** (T058): Load tasks template from `{TEMPLATE_DIR}/tasks-template.md` as structure, fill with:
+5. **Generate tasks.md** (T058): **Read** tasks template from `{TEMPLATE_DIR}/tasks-template.md` using Read tool, then fill with:
    - **Output file path**:
      - **IMPORTANT**: Use TASKS path from prerequisite context, NOT FEATURE_DIR
      - If `--branch` flag provided: Replace `.md` extension in TASKS path with `-<branch-name>.md`

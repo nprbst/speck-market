@@ -23,8 +23,8 @@ Follow this execution flow:
 1. **Get template directory**: Run `speck check-prerequisites --json --skip-feature-check` and extract `TEMPLATE_DIR` from the JSON output.
 
 2. Check if `.speck/memory/constitution.md` exists in the project root:
-   - If it exists: Load it as the working copy
-   - If it doesn't exist: Copy from `{TEMPLATE_DIR}/constitution-template.md` to `.speck/memory/constitution.md` first, then load it
+   - If it exists: **Read** it as the working copy using Read tool
+   - If it doesn't exist: **Read** `{TEMPLATE_DIR}/constitution-template.md` using Read tool, then **Write** to `.speck/memory/constitution.md`
    - Identify every placeholder token of the form `[ALL_CAPS_IDENTIFIER]`
    **IMPORTANT**: The user might require less or more principles than the ones used in the template. If a number is specified, respect that - follow the general template. You will update the doc accordingly.
 
@@ -44,11 +44,11 @@ Follow this execution flow:
    - Ensure each Principle section: succinct name line, paragraph (or bullet list) capturing non‑negotiable rules, explicit rationale if not obvious.
    - Ensure Governance section lists amendment procedure, versioning policy, and compliance review expectations.
 
-5. Consistency propagation checklist (convert prior checklist into active validations):
-   - Read `{TEMPLATE_DIR}/plan-template.md` and ensure any "Constitution Check" or rules align with updated principles.
-   - Read `{TEMPLATE_DIR}/spec-template.md` for scope/requirements alignment—update if constitution adds/removes mandatory sections or constraints.
-   - Read `{TEMPLATE_DIR}/tasks-template.md` and ensure task categorization reflects new or removed principle-driven task types (e.g., observability, versioning, testing discipline).
-   - Read any runtime guidance docs (e.g., `README.md`, `docs/quickstart.md`, or agent-specific guidance files if present). Update references to principles changed.
+5. Consistency propagation checklist (use Read tool for all template files):
+   - **Read** `{TEMPLATE_DIR}/plan-template.md` and ensure any "Constitution Check" or rules align with updated principles.
+   - **Read** `{TEMPLATE_DIR}/spec-template.md` for scope/requirements alignment—update if constitution adds/removes mandatory sections or constraints.
+   - **Read** `{TEMPLATE_DIR}/tasks-template.md` and ensure task categorization reflects new or removed principle-driven task types (e.g., observability, versioning, testing discipline).
+   - **Read** any runtime guidance docs (e.g., `README.md`, `docs/quickstart.md`, or agent-specific guidance files if present). Update references to principles changed.
 
 6. Produce a Sync Impact Report (prepend as an HTML comment at top of the constitution file after update):
    - Version change: old → new

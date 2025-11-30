@@ -91,7 +91,7 @@ Given that feature description, do this:
      - If user passed `--worktree` flag: Also pass it to force worktree creation
      - If user passed `--no-deps` flag: Also pass it to skip dependency installation
 
-3. Load spec template from `{TEMPLATE_DIR}/spec-template.md` to understand required sections.
+3. **Read** spec template from `{TEMPLATE_DIR}/spec-template.md` using Read tool to understand required sections.
 
 4. Follow this execution flow:
 

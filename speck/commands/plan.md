@@ -57,9 +57,9 @@ Parse command-line flags from user input:
    ```
    Then manually parse the JSON output to extract FEATURE_SPEC, IMPL_PLAN, SPECS_DIR, and BRANCH.
 
-2. **Load context**:
-   - Read spec.md and constitution.md from paths in AVAILABLE_DOCS using Read tool
-   - Load plan template from `{TEMPLATE_DIR}/plan-template.md` using Read tool
+2. **Load context** (use Read tool for all files):
+   - **Read** spec.md and constitution.md from paths in AVAILABLE_DOCS
+   - **Read** plan template from `{TEMPLATE_DIR}/plan-template.md` (e.g., `/Users/.../.claude/plugins/.../templates/plan-template.md`)
 
 3. **Execute plan workflow**: Follow the structure in IMPL_PLAN template to:
    - Fill Technical Context (mark unknowns as "NEEDS CLARIFICATION")
