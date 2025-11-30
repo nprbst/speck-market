@@ -8212,7 +8212,9 @@ async function main2(args) {
     }
   }
   let actualSpecsDir;
-  if (useWorktree && worktreePath) {
+  if (isSharedSpec) {
+    actualSpecsDir = specsDir;
+  } else if (useWorktree && worktreePath) {
     actualSpecsDir = path4.join(worktreePath, "specs");
   } else {
     actualSpecsDir = specsDir;
@@ -9473,6 +9475,12 @@ function buildSubcommandArgs(args, options, rawArgs) {
         } else if (value === false) {
           result.push("--no-worktree");
         }
+      }
+      continue;
+    }
+    if (key === "ide") {
+      if (value === false) {
+        result.push("--no-ide");
       }
       continue;
     }

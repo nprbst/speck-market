@@ -756,12 +756,16 @@ export async function main(args: string[]): Promise<number> {
   // [SPECK-EXTENSION:START] T064-T066, T119: Handle shared vs local spec creation
   // T119: In worktree mode, write spec to worktree's specs/ directory (not main repo)
   // This ensures spec.md is created on the feature branch, not main
+  // EXCEPTION: --shared-spec in multi-repo mode always uses speckRoot/specs/
   let actualSpecsDir: string;
-  if (useWorktree && worktreePath) {
-    // Worktree mode: spec goes into worktree's specs/ directory
+  if (isSharedSpec) {
+    // T064: Shared spec always goes to speckRoot/specs/ (ignores worktree)
+    actualSpecsDir = specsDir; // Already set to path.join(config.speckRoot, "specs")
+  } else if (useWorktree && worktreePath) {
+    // T119: Worktree mode (non-shared): spec goes into worktree's specs/ directory
     actualSpecsDir = path.join(worktreePath, "specs");
   } else {
-    // Non-worktree mode: use previously determined specsDir (repoRoot or speckRoot)
+    // Non-worktree mode: use previously determined specsDir (repoRoot)
     actualSpecsDir = specsDir;
   }
 
