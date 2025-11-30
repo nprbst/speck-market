@@ -9054,6 +9054,303 @@ var init_init = __esm(() => {
   if (false) {}
 });
 
+// .speck/scripts/commands/link.ts
+var exports_link = {};
+__export(exports_link, {
+  main: () => main5
+});
+import {
+  existsSync as existsSync9,
+  mkdirSync as mkdirSync4,
+  lstatSync as lstatSync2,
+  readlinkSync as readlinkSync2,
+  unlinkSync as unlinkSync2,
+  symlinkSync as symlinkSync3,
+  readFileSync as readFileSync4,
+  writeFileSync as writeFileSync3,
+  appendFileSync
+} from "fs";
+import { join as join5, resolve as resolve3, relative as relative2, basename as basename3, isAbsolute } from "path";
+import { parseArgs as parseArgs4 } from "util";
+function getGitRoot(cwd) {
+  try {
+    const result = Bun.spawnSync(["git", "rev-parse", "--show-toplevel"], {
+      cwd
+    });
+    if (result.exitCode === 0) {
+      return result.stdout.toString().trim();
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+function detectLinkType(currentPath, targetPath) {
+  const currentGitRoot = getGitRoot(currentPath);
+  const targetGitRoot = getGitRoot(targetPath);
+  if (!currentGitRoot || !targetGitRoot) {
+    return "multi-repo";
+  }
+  return resolve3(currentGitRoot) === resolve3(targetGitRoot) ? "monorepo" : "multi-repo";
+}
+function getGitRemoteUrl() {
+  try {
+    const result = Bun.spawnSync(["git", "remote", "get-url", "origin"], {
+      cwd: process.cwd()
+    });
+    if (result.exitCode === 0) {
+      return result.stdout.toString().trim();
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+function getRepoName2() {
+  const remoteUrl = getGitRemoteUrl();
+  if (remoteUrl) {
+    const match = remoteUrl.match(/\/([^/]+?)(?:\.git)?$/) || remoteUrl.match(/:([^/]+?)(?:\.git)?$/);
+    if (match) {
+      return match[1];
+    }
+  }
+  return basename3(process.cwd());
+}
+function getGitUserName() {
+  try {
+    const result = Bun.spawnSync(["git", "config", "user.name"], {
+      cwd: process.cwd()
+    });
+    if (result.exitCode === 0) {
+      return result.stdout.toString().trim();
+    }
+    return "Unknown";
+  } catch {
+    return "Unknown";
+  }
+}
+function getTodayDate() {
+  const now = new Date;
+  return now.toISOString().split("T")[0];
+}
+function adjustPathForSpeckDepth(inputPath) {
+  if (isAbsolute(inputPath)) {
+    return inputPath;
+  }
+  return join5("..", inputPath);
+}
+function verifySymlinkWorks(symlinkPath) {
+  try {
+    return existsSync9(symlinkPath);
+  } catch {
+    return false;
+  }
+}
+function updateLinkedReposFile(speckRootPath, repoName, remoteUrl, relativePath, userName, todayDate, linkType) {
+  const linkedReposPath = join5(speckRootPath, ".speck", "linked-repos.md");
+  const linkTypeLabel = linkType === "monorepo" ? "monorepo package" : "multi-repo child";
+  const entry = `
+### ${repoName}
+- **Type**: ${linkTypeLabel}
+- **Repository**: \`${remoteUrl || "local"}\`
+- **Local Path**: \`${relativePath}\`
+- **Linked**: ${todayDate}
+- **Contact**: ${userName}
+- **Active Features**: None yet
+- **Notes**: ${linkType === "monorepo" ? "Package within same git repository" : "Separate git repository"}
+`;
+  try {
+    if (!existsSync9(linkedReposPath)) {
+      const content = `# Linked Repositories
+
+<!-- Active links are listed below -->
+${entry}
+## Link Management
+
+To link a new repository:
+\`\`\`bash
+cd /path/to/child-repo
+speck link /path/to/speck-root
+\`\`\`
+`;
+      writeFileSync3(linkedReposPath, content);
+    } else {
+      const content = readFileSync4(linkedReposPath, "utf-8");
+      if (content.includes(`### ${repoName}`)) {
+        return true;
+      }
+      const linkManagementPos = content.indexOf("## Link Management");
+      if (linkManagementPos !== -1) {
+        const before = content.slice(0, linkManagementPos);
+        const after = content.slice(linkManagementPos);
+        writeFileSync3(linkedReposPath, before + entry + `
+` + after);
+      } else {
+        appendFileSync(linkedReposPath, entry);
+      }
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+function createReverseSymlink(speckRootPath, repoName, currentRepoPath) {
+  const reposDir = join5(speckRootPath, ".speck", "repos");
+  const reverseSymlinkPath = join5(reposDir, repoName);
+  try {
+    if (!existsSync9(reposDir)) {
+      mkdirSync4(reposDir, { recursive: true });
+    }
+    const relativePath = relative2(reposDir, currentRepoPath);
+    if (existsSync9(reverseSymlinkPath)) {
+      if (lstatSync2(reverseSymlinkPath).isSymbolicLink()) {
+        unlinkSync2(reverseSymlinkPath);
+      } else {
+        return null;
+      }
+    }
+    symlinkSync3(relativePath, reverseSymlinkPath);
+    return reverseSymlinkPath;
+  } catch {
+    return null;
+  }
+}
+function runLink(targetPath, options) {
+  const cwd = process.cwd();
+  if (!existsSync9(targetPath)) {
+    return {
+      success: false,
+      message: `Error: Target path does not exist: ${targetPath}`
+    };
+  }
+  const targetSpeckDir = join5(targetPath, ".speck");
+  if (!existsSync9(targetSpeckDir)) {
+    return {
+      success: false,
+      message: `Error: Target is not a valid speck root (missing .speck/ directory): ${targetPath}
+Run 'speck init' in the target directory first.`
+    };
+  }
+  const adjustedPath = adjustPathForSpeckDepth(targetPath);
+  const speckDir = join5(cwd, ".speck");
+  if (!existsSync9(speckDir)) {
+    mkdirSync4(speckDir, { recursive: true });
+  }
+  const symlinkPath = join5(speckDir, "root");
+  if (existsSync9(symlinkPath)) {
+    if (lstatSync2(symlinkPath).isSymbolicLink()) {
+      const currentTarget = readlinkSync2(symlinkPath);
+      if (currentTarget === adjustedPath) {
+        return {
+          success: true,
+          message: `Already linked to ${targetPath}`,
+          symlinkPath,
+          targetPath: adjustedPath
+        };
+      }
+      unlinkSync2(symlinkPath);
+    } else {
+      return {
+        success: false,
+        message: `Error: .speck/root exists but is not a symlink. Remove it manually to proceed.`
+      };
+    }
+  }
+  try {
+    symlinkSync3(adjustedPath, symlinkPath);
+  } catch (error) {
+    const errMsg = error instanceof Error ? error.message : String(error);
+    return {
+      success: false,
+      message: `Error creating symlink: ${errMsg}`
+    };
+  }
+  if (!verifySymlinkWorks(symlinkPath)) {
+    unlinkSync2(symlinkPath);
+    return {
+      success: false,
+      message: `Error: Symlink created but target is not accessible. Check the path: ${targetPath}`
+    };
+  }
+  const repoName = getRepoName2();
+  const remoteUrl = getGitRemoteUrl();
+  const userName = getGitUserName();
+  const todayDate = getTodayDate();
+  const resolvedTargetPath = resolve3(cwd, adjustedPath.replace(/^\.\.\//, ""));
+  const linkType = detectLinkType(cwd, resolvedTargetPath);
+  const relativeFromRoot = relative2(resolvedTargetPath, cwd);
+  const reverseSymlinkPath = createReverseSymlink(resolvedTargetPath, repoName, cwd);
+  const linkedReposUpdated = updateLinkedReposFile(resolvedTargetPath, repoName, remoteUrl, relativeFromRoot, userName, todayDate, linkType);
+  const linkTypeLabel = linkType === "monorepo" ? "monorepo package" : "multi-repo child";
+  const messages = [];
+  messages.push(`\u2713 Linked as ${linkTypeLabel} to speck root: ${targetPath}`);
+  messages.push(`  Symlink: .speck/root \u2192 ${adjustedPath}`);
+  if (reverseSymlinkPath) {
+    messages.push(`  Reverse symlink created at speck root`);
+  }
+  if (linkedReposUpdated) {
+    messages.push(`  Updated linked-repos.md`);
+  }
+  return {
+    success: true,
+    message: messages.join(`
+`),
+    symlinkPath,
+    targetPath: adjustedPath,
+    repoName,
+    linkType,
+    reverseSymlinkPath: reverseSymlinkPath ?? undefined,
+    linkedReposUpdated
+  };
+}
+function formatOutput2(result, options) {
+  if (options.json) {
+    return JSON.stringify({
+      ok: result.success,
+      result: {
+        symlinkPath: result.symlinkPath,
+        targetPath: result.targetPath,
+        repoName: result.repoName,
+        linkType: result.linkType,
+        reverseSymlinkPath: result.reverseSymlinkPath,
+        linkedReposUpdated: result.linkedReposUpdated
+      },
+      message: result.message
+    }, null, 2);
+  }
+  return result.message;
+}
+async function main5(args) {
+  const { values, positionals } = parseArgs4({
+    args,
+    options: {
+      json: { type: "boolean", default: false }
+    },
+    allowPositionals: true
+  });
+  if (positionals.length === 0) {
+    const errorMsg = `Error: Missing required argument <path>
+
+Usage: speck link <path> [--json]`;
+    if (values.json) {
+      console.log(JSON.stringify({ ok: false, message: errorMsg }, null, 2));
+    } else {
+      console.error(errorMsg);
+    }
+    return 1;
+  }
+  const targetPath = positionals[0];
+  const options = {
+    json: values.json ?? false
+  };
+  const result = runLink(targetPath, options);
+  console.log(formatOutput2(result, options));
+  return result.success ? 0 : 1;
+}
+var init_link = __esm(() => {
+  if (false) {}
+});
+
 // .speck/scripts/worktree/cli-launch-ide.ts
 var exports_cli_launch_ide = {};
 __export(exports_cli_launch_ide, {
@@ -9112,12 +9409,12 @@ var init_cli_launch_ide = __esm(() => {
 // .speck/scripts/setup-plan.ts
 var exports_setup_plan = {};
 __export(exports_setup_plan, {
-  main: () => main5
+  main: () => main6
 });
-import { existsSync as existsSync9, mkdirSync as mkdirSync4, copyFileSync as copyFileSync2 } from "fs";
+import { existsSync as existsSync10, mkdirSync as mkdirSync5, copyFileSync as copyFileSync2 } from "fs";
 import path6 from "path";
 var {$: $5 } = globalThis.Bun;
-function parseArgs4(args) {
+function parseArgs5(args) {
   return {
     json: args.includes("--json"),
     help: args.includes("--help") || args.includes("-h")
@@ -9128,8 +9425,8 @@ function showHelp4() {
   --json    Output results in JSON format
   --help    Show this help message`);
 }
-async function main5(args) {
-  const options = parseArgs4(args);
+async function main6(args) {
+  const options = parseArgs5(args);
   if (options.help) {
     showHelp4();
     return 0 /* SUCCESS */;
@@ -9139,7 +9436,7 @@ async function main5(args) {
   if (!await checkFeatureBranch(paths.CURRENT_BRANCH, hasGitRepo, paths.REPO_ROOT)) {
     return 1 /* USER_ERROR */;
   }
-  mkdirSync4(paths.FEATURE_DIR, { recursive: true });
+  mkdirSync5(paths.FEATURE_DIR, { recursive: true });
   const branchName = paths.CURRENT_BRANCH;
   const config = await detectSpeckRoot();
   if (hasGitRepo) {
@@ -9159,7 +9456,7 @@ async function main5(args) {
       console.error(`[specify] Warning: Could not manage git branch: ${String(error)}`);
     }
     const specFile = paths.FEATURE_SPEC;
-    const isSharedSpec = config.mode === "multi-repo" && existsSync9(specFile);
+    const isSharedSpec = config.mode === "multi-repo" && existsSync10(specFile);
     if (isSharedSpec) {
       const parentRepoRoot = config.speckRoot;
       let parentHasGit = false;
@@ -9188,9 +9485,9 @@ async function main5(args) {
     }
   }
   const template = path6.join(getTemplatesDir(), "plan-template.md");
-  if (existsSync9(template)) {
+  if (existsSync10(template)) {
     const implPlanDir = path6.dirname(paths.IMPL_PLAN);
-    mkdirSync4(implPlanDir, { recursive: true });
+    mkdirSync5(implPlanDir, { recursive: true });
     copyFileSync2(template, paths.IMPL_PLAN);
     console.log(`Copied plan template to ${paths.IMPL_PLAN}`);
   } else {
@@ -9224,9 +9521,9 @@ var init_setup_plan = __esm(async () => {
 // .speck/scripts/update-agent-context.ts
 var exports_update_agent_context = {};
 __export(exports_update_agent_context, {
-  main: () => main6
+  main: () => main7
 });
-import { existsSync as existsSync10, readFileSync as readFileSync4, writeFileSync as writeFileSync3 } from "fs";
+import { existsSync as existsSync11, readFileSync as readFileSync5, writeFileSync as writeFileSync4 } from "fs";
 import path7 from "path";
 function extractPlanField(fieldPattern, planContent) {
   const regex = new RegExp(`^\\*\\*${fieldPattern}\\*\\*: (.+)$`, "m");
@@ -9240,11 +9537,11 @@ function extractPlanField(fieldPattern, planContent) {
   return value;
 }
 function parsePlanData(planFile) {
-  if (!existsSync10(planFile)) {
+  if (!existsSync11(planFile)) {
     console.error(`ERROR: Plan file not found: ${planFile}`);
     process.exit(1 /* USER_ERROR */);
   }
-  const content = readFileSync4(planFile, "utf-8");
+  const content = readFileSync5(planFile, "utf-8");
   const lang = extractPlanField("Language/Version", content);
   const framework = extractPlanField("Primary Dependencies", content);
   const db = extractPlanField("Storage", content);
@@ -9298,12 +9595,12 @@ function getLanguageConventions(lang) {
   return `${lang ?? "Unknown"}: Follow standard conventions`;
 }
 function createNewClaudeFile(targetFile, templateFile, projectName, currentDate, currentBranch, lang, framework, projectType) {
-  if (!existsSync10(templateFile)) {
+  if (!existsSync11(templateFile)) {
     console.error(`ERROR: Template not found at ${templateFile}`);
     process.exit(1 /* USER_ERROR */);
   }
   console.log("INFO: Creating new CLAUDE.md from template...");
-  let content = readFileSync4(templateFile, "utf-8");
+  let content = readFileSync5(templateFile, "utf-8");
   let techStack = "";
   let recentChange = "";
   if (lang && framework) {
@@ -9329,12 +9626,12 @@ function createNewClaudeFile(targetFile, templateFile, projectName, currentDate,
   content = content.replace(/\[ONLY COMMANDS FOR ACTIVE TECHNOLOGIES\]/g, commands);
   content = content.replace(/\[LANGUAGE-SPECIFIC, ONLY FOR LANGUAGES IN USE\]/g, languageConventions);
   content = content.replace(/\[LAST 3 FEATURES AND WHAT THEY ADDED\]/g, recentChange);
-  writeFileSync3(targetFile, content, "utf-8");
+  writeFileSync4(targetFile, content, "utf-8");
   console.log(`\u2713 Created CLAUDE.md`);
 }
 function updateExistingClaudeFile(targetFile, currentDate, currentBranch, lang, framework, db) {
   console.log("INFO: Updating existing CLAUDE.md...");
-  const content = readFileSync4(targetFile, "utf-8");
+  const content = readFileSync5(targetFile, "utf-8");
   const lines = content.split(`
 `);
   const output = [];
@@ -9404,7 +9701,7 @@ function updateExistingClaudeFile(targetFile, currentDate, currentBranch, lang, 
       output.push(line);
     }
   }
-  writeFileSync3(targetFile, output.join(`
+  writeFileSync4(targetFile, output.join(`
 `), "utf-8");
   console.log(`\u2713 Updated CLAUDE.md`);
 }
@@ -9414,7 +9711,7 @@ function updateClaudeFile(repoRoot, currentBranch, lang, framework, db, projectT
   const projectName = path7.basename(repoRoot);
   const currentDate = new Date().toISOString().split("T")[0];
   const templateFile = path7.join(getTemplatesDir(), "agent-file-template.md");
-  if (!existsSync10(targetFile)) {
+  if (!existsSync11(targetFile)) {
     createNewClaudeFile(targetFile, templateFile, projectName, currentDate, currentBranch, lang, framework, projectType);
   } else {
     updateExistingClaudeFile(targetFile, currentDate, currentBranch, lang, framework, db);
@@ -9433,7 +9730,7 @@ function printSummary(lang, framework, db) {
     console.log(`  - Added database: ${db}`);
   }
 }
-async function main6(_args) {
+async function main7(_args) {
   const paths = await getFeaturePaths();
   if (!paths.CURRENT_BRANCH) {
     console.error("ERROR: Unable to determine current feature");
@@ -9444,7 +9741,7 @@ async function main6(_args) {
     }
     return 1 /* USER_ERROR */;
   }
-  if (!existsSync10(paths.IMPL_PLAN)) {
+  if (!existsSync11(paths.IMPL_PLAN)) {
     console.error(`ERROR: No plan.md found at ${paths.IMPL_PLAN}`);
     console.log("INFO: Make sure you're working on a feature with a corresponding spec directory");
     if (paths.HAS_GIT !== "true") {
@@ -9483,12 +9780,13 @@ var {
 } = import__.default;
 
 // src/cli/index.ts
-import { readFileSync as readFileSync5, existsSync as existsSync11 } from "fs";
-import { join as join5, dirname as dirname3 } from "path";
+import { readFileSync as readFileSync6, existsSync as existsSync12 } from "fs";
+import { join as join6, dirname as dirname3 } from "path";
 var lazyCheckPrerequisites = () => init_check_prerequisites().then(() => exports_check_prerequisites);
 var lazyCreateNewFeature = () => init_create_new_feature().then(() => exports_create_new_feature);
 var lazyEnvCommand = () => init_env_command().then(() => exports_env_command);
 var lazyInitCommand = () => Promise.resolve().then(() => (init_init(), exports_init));
+var lazyLinkCommand = () => Promise.resolve().then(() => (init_link(), exports_link));
 var lazyLaunchIDECommand = () => Promise.resolve().then(() => (init_cli_launch_ide(), exports_cli_launch_ide));
 var lazySetupPlan = () => init_setup_plan().then(() => exports_setup_plan);
 var lazyUpdateAgentContext = () => init_update_agent_context().then(() => exports_update_agent_context);
@@ -9498,13 +9796,13 @@ var globalState = {
 function getVersion() {
   try {
     const possiblePaths = [
-      join5(dirname3(import.meta.path), "../../package.json"),
-      join5(dirname3(import.meta.path), "../../../package.json"),
-      join5(process.cwd(), "package.json")
+      join6(dirname3(import.meta.path), "../../package.json"),
+      join6(dirname3(import.meta.path), "../../../package.json"),
+      join6(process.cwd(), "package.json")
     ];
     for (const pkgPath of possiblePaths) {
-      if (existsSync11(pkgPath)) {
-        const pkg = JSON.parse(readFileSync5(pkgPath, "utf-8"));
+      if (existsSync12(pkgPath)) {
+        const pkg = JSON.parse(readFileSync6(pkgPath, "utf-8"));
         if (pkg.version) {
           return pkg.version;
         }
@@ -9569,6 +9867,12 @@ function createProgram() {
     const exitCode = await module.main(args);
     process.exit(exitCode);
   });
+  program2.command("link").description("Link repository to multi-repo speck root").argument("<path>", "Path to speck root directory").option("--json", "Output in JSON format").action(async (path8, options) => {
+    const module = await lazyLinkCommand();
+    const args = [path8, ...buildSubcommandArgs([], options)];
+    const exitCode = await module.main(args);
+    process.exit(exitCode);
+  });
   program2.command("create-new-feature").description("Create a new feature specification directory").argument("<description>", "Feature description").option("--json", "Output in JSON format").option("--short-name <name>", "Custom short name for the branch").option("--number <n>", "Specify branch number manually", parseInt).option("--shared-spec", "Create spec at speckRoot (multi-repo shared spec)").option("--local-spec", "Create spec locally in child repo").option("--worktree", "Create a worktree for the feature branch (overrides config)").option("--no-worktree", "Skip worktree creation (overrides config)").option("--no-ide", "Skip IDE auto-launch").action(async (description, options, command) => {
     const module = await lazyCreateNewFeature();
     const rawArgs = command.args.concat(process.argv.slice(3));
@@ -9628,14 +9932,14 @@ function createProgram() {
   });
   return program2;
 }
-async function main7() {
+async function main8() {
   const program2 = createProgram();
   if (process.argv.length === 2) {
     program2.help();
   }
   await program2.parseAsync(process.argv);
 }
-main7().catch((error) => {
+main8().catch((error) => {
   const message = error instanceof Error ? error.message : String(error);
   console.error("Fatal error:", message);
   process.exit(1);
