@@ -8653,13 +8653,24 @@ async function promptIDE(defaultEditor) {
     });
   });
 }
-async function createSpeckConfig(speckDir, isInteractive) {
+async function createSpeckConfig(speckDir, isInteractive, options) {
   const configPath = join4(speckDir, "config.json");
   if (existsSync7(configPath)) {
     return false;
   }
-  const config = { ...DEFAULT_SPECK_CONFIG };
-  if (isInteractive) {
+  const config = JSON.parse(JSON.stringify(DEFAULT_SPECK_CONFIG));
+  const hasConfigFlags = options.worktreeEnabled !== undefined || options.ideAutolaunch !== undefined || options.ideEditor !== undefined;
+  if (hasConfigFlags) {
+    if (options.worktreeEnabled !== undefined) {
+      config.worktree.enabled = options.worktreeEnabled;
+    }
+    if (options.ideAutolaunch !== undefined) {
+      config.worktree.ide.autoLaunch = options.ideAutolaunch;
+    }
+    if (options.ideEditor !== undefined && IDE_EDITORS.includes(options.ideEditor)) {
+      config.worktree.ide.editor = options.ideEditor;
+    }
+  } else if (isInteractive) {
     console.log(`
 \uD83D\uDCCB Configure Speck preferences:
 `);
@@ -8744,7 +8755,7 @@ Then run 'speck init' again.`,
     const constitutionPath = join4(speckResult.path, "memory", "constitution.md");
     needsConstitution = !existsSync7(constitutionPath);
     const isInteractive = !options.json && process.stdin.isTTY;
-    configCreated = await createSpeckConfig(speckResult.path, isInteractive);
+    configCreated = await createSpeckConfig(speckResult.path, isInteractive, options);
   }
   const permissionsConfigured = configurePluginPermissions(gitRoot);
   if (!existsSync7(bootstrapPath)) {
@@ -8892,13 +8903,24 @@ async function main4(args) {
     args,
     options: {
       force: { type: "boolean", default: false },
-      json: { type: "boolean", default: false }
+      json: { type: "boolean", default: false },
+      "worktree-enabled": { type: "string" },
+      "ide-autolaunch": { type: "string" },
+      "ide-editor": { type: "string" }
     },
     allowPositionals: true
   });
+  const parseBoolean = (val) => {
+    if (val === undefined)
+      return;
+    return val.toLowerCase() === "true" || val === "1" || val.toLowerCase() === "yes";
+  };
   const options = {
     force: values.force ?? false,
-    json: values.json ?? false
+    json: values.json ?? false,
+    worktreeEnabled: parseBoolean(values["worktree-enabled"]),
+    ideAutolaunch: parseBoolean(values["ide-autolaunch"]),
+    ideEditor: values["ide-editor"]
   };
   const result = await runInit(options);
   console.log(formatOutput(result, options));
@@ -9014,7 +9036,7 @@ function createProgram() {
     const opts = thisCommand.opts();
     processGlobalOptions(opts);
   });
-  program2.command("init").description("Install Speck CLI globally via symlink to ~/.local/bin/speck").option("--json", "Output in JSON format").option("--force", "Force reinstall even if symlink exists").action(async (options) => {
+  program2.command("init").description("Install Speck CLI globally via symlink to ~/.local/bin/speck").option("--json", "Output in JSON format").option("--force", "Force reinstall even if symlink exists").option("--worktree-enabled <bool>", "Enable worktree mode (true/false)").option("--ide-autolaunch <bool>", "Auto-launch IDE when creating features (true/false)").option("--ide-editor <editor>", "IDE editor choice (vscode/cursor/webstorm/idea/pycharm)").action(async (options) => {
     const module = await lazyInitCommand();
     const args = buildSubcommandArgs([], options);
     const exitCode = await module.main(args);
