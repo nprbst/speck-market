@@ -843,7 +843,8 @@ async function runPrerequisiteCheck(options = {}, useCache = true) {
     const { exitCode, stdout, stderr } = await captureOutput(() => main(args));
     if (exitCode === 0) {
       try {
-        const output = JSON.parse(stdout);
+        const parsed = JSON.parse(stdout);
+        const output = "result" in parsed && parsed.result ? parsed.result : parsed;
         const result = {
           success: true,
           output,

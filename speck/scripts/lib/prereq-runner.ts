@@ -105,9 +105,11 @@ export async function runPrerequisiteCheck(
     );
 
     if (exitCode === 0) {
-      // Parse JSON output
+      // Parse JSON output - handle wrapped {ok: true, result: {...}} format
       try {
-        const output = JSON.parse(stdout) as ValidationOutput;
+        const parsed = JSON.parse(stdout) as { ok?: boolean; result?: ValidationOutput } | ValidationOutput;
+        // Unwrap .result if present (from formatJsonOutput wrapper)
+        const output = ('result' in parsed && parsed.result) ? parsed.result : parsed as ValidationOutput;
         const result: PrereqCheckResult = {
           success: true,
           output,

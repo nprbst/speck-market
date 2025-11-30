@@ -171,6 +171,9 @@ export async function main(args: string[]): Promise<number> {
   // Copy plan template if it exists
   const template = path.join(getTemplatesDir(), "plan-template.md");
   if (existsSync(template)) {
+    // Ensure the parent directory of IMPL_PLAN exists (local specs dir in multi-repo mode)
+    const implPlanDir = path.dirname(paths.IMPL_PLAN);
+    mkdirSync(implPlanDir, { recursive: true });
     copyFileSync(template, paths.IMPL_PLAN);
     console.log(`Copied plan template to ${paths.IMPL_PLAN}`);
   } else {

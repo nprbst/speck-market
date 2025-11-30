@@ -9141,6 +9141,8 @@ async function main5(args) {
   }
   const template = path6.join(getTemplatesDir(), "plan-template.md");
   if (existsSync8(template)) {
+    const implPlanDir = path6.dirname(paths.IMPL_PLAN);
+    mkdirSync4(implPlanDir, { recursive: true });
     copyFileSync2(template, paths.IMPL_PLAN);
     console.log(`Copied plan template to ${paths.IMPL_PLAN}`);
   } else {
