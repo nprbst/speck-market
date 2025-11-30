@@ -2168,6 +2168,9 @@ function getPluginRoot() {
     return process.env.CLAUDE_PLUGIN_ROOT;
   }
   const scriptDir = import.meta.dir;
+  if (scriptDir.endsWith("/dist") || scriptDir.includes("/dist/")) {
+    return path.resolve(scriptDir, "..");
+  }
   if (isPluginInstallation()) {
     return path.resolve(scriptDir, "../../..");
   } else {

@@ -124,6 +124,12 @@ export function getPluginRoot(): string {
 
   const scriptDir = import.meta.dir;
 
+  // Handle bundled CLI case: dist/speck-cli.js
+  // scriptDir will be <plugin-root>/dist/ so go up 1 level
+  if (scriptDir.endsWith("/dist") || scriptDir.includes("/dist/")) {
+    return path.resolve(scriptDir, "..");
+  }
+
   if (isPluginInstallation()) {
     // In plugin: scripts are in <plugin-root>/.speck/scripts/common/
     // Navigate up from .speck/scripts/common to plugin root
