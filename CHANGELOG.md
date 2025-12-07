@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [speck-reviewer v1.1.3] - 2025-12-07
+
+### Added
+
+- **speck-reviewer**: add skill file read permission to init
+
+### Changed
+
+- **init**: replace bash script with LLM-friendly .gitignore instructions
+
 ## [speck-reviewer v1.1.2] - 2025-12-07
 
 ### Added

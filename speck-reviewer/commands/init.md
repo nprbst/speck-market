@@ -43,6 +43,7 @@ After CLI installation succeeds, configure auto-allow permissions by adding thes
 {
   "permissions": {
     "allow": [
+      "Read(~/.claude/plugins/marketplaces/speck-market/speck-reviewer/skills/**)",
       "Bash(gh pr list:*)",
       "Bash(gh pr view:*)",
       "Bash(gh pr diff:*)",
@@ -58,19 +59,14 @@ If `.claude/settings.local.json` already exists, merge these permissions into th
 
 ### Configure .gitignore
 
-Add `review-state.json` to `.speck/.gitignore` to prevent committing machine-specific review state:
+Add `review-state.json` to `.speck/.gitignore` to prevent committing machine-specific review state.
 
-```bash
-# Ensure review-state.json is in .speck/.gitignore
-if [ -f .speck/.gitignore ]; then
-  if ! grep -q "review-state.json" .speck/.gitignore; then
-    echo "review-state.json" >> .speck/.gitignore
-  fi
-else
-  mkdir -p .speck
-  echo "# Machine-specific files" > .speck/.gitignore
-  echo "review-state.json" >> .speck/.gitignore
-fi
+**If `.speck/.gitignore` exists:** Read it, and if `review-state.json` is not already present, add it to the file using the Edit tool.
+
+**If `.speck/.gitignore` does not exist:** Create it with:
+```
+# Machine-specific files
+review-state.json
 ```
 
 ### PATH Configuration
