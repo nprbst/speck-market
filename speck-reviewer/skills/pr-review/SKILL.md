@@ -32,12 +32,12 @@ walkthrough:
 
 1. **Analyze PR with clustering**:
    ```bash
-   bun run ${CLAUDE_PLUGIN_ROOT}/cli/src/index.ts analyze <PR_NUMBER>
+   speck-review analyze <PR_NUMBER>
    ```
 
 2. **Check for self-review**:
    ```bash
-   bun run ${CLAUDE_PLUGIN_ROOT}/cli/src/index.ts check-self-review <PR_AUTHOR>
+   speck-review check-self-review <PR_AUTHOR>
    ```
    If self-review detected, announce clearly with this messaging:
 
@@ -240,10 +240,10 @@ Track review progress in `.speck/review-state.json`:
 
 ```bash
 # Show current state
-bun run ${CLAUDE_PLUGIN_ROOT}/cli/src/index.ts state show
+speck-review state show
 
 # Clear state (start fresh)
-bun run ${CLAUDE_PLUGIN_ROOT}/cli/src/index.ts state clear
+speck-review state clear
 ```
 
 **When initializing a new review:**
@@ -285,7 +285,7 @@ bun run ${CLAUDE_PLUGIN_ROOT}/cli/src/index.ts state clear
 
 At the start of any review:
 
-1. Check: `bun run ${CLAUDE_PLUGIN_ROOT}/cli/src/index.ts state show`
+1. Check: `speck-review state show`
 2. If state exists:
    - Validate PR# and branch match current checkout
    - If match → Offer to resume: "Found existing review for PR #X. Resume where
@@ -423,10 +423,10 @@ gh pr diff <PR_NUMBER>
 gh pr diff <PR_NUMBER> --name-only
 
 # Check for existing review comments (shows resolved vs open)
-bun run ${CLAUDE_PLUGIN_ROOT}/cli/src/index.ts list-comments
+speck-review list-comments
 
 # List changed files with clickable links (after checkout)
-bun run ${CLAUDE_PLUGIN_ROOT}/cli/src/index.ts files
+speck-review files
 ```
 
 **Note on file-specific diffs:** `gh pr diff` doesn't support file path filtering.
@@ -681,7 +681,7 @@ Support these natural language commands:
 **Batch posting:**
 
 - "post all" → Post all staged comments sequentially
-- For each comment: `bun run ${CLAUDE_PLUGIN_ROOT}/cli/src/index.ts comment <file> <line> "<body>"`
+- For each comment: `speck-review comment <file> <line> "<body>"`
 
 **After posting:**
 
@@ -824,23 +824,23 @@ Only after approval, execute:
 For each approved comment:
 
 ```bash
-bun run ${CLAUDE_PLUGIN_ROOT}/cli/src/index.ts comment <file> <line> "<message>"
+speck-review comment <file> <line> "<message>"
 ```
 
 ### Submit Review
 
 ```bash
 # Keep review body SHORT - detailed feedback is in line comments
-bun run ${CLAUDE_PLUGIN_ROOT}/cli/src/index.ts review approve "Short summary here."
+speck-review review approve "Short summary here."
 
 # Or for changes requested:
-bun run ${CLAUDE_PLUGIN_ROOT}/cli/src/index.ts review request-changes "Please address the comments above."
+speck-review review request-changes "Please address the comments above."
 ```
 
 ### Reply to Existing Comments (if needed)
 
 ```bash
-bun run ${CLAUDE_PLUGIN_ROOT}/cli/src/index.ts comment-reply <comment_id> "<reply>"
+speck-review comment-reply <comment_id> "<reply>"
 ```
 
 ---
@@ -849,32 +849,32 @@ bun run ${CLAUDE_PLUGIN_ROOT}/cli/src/index.ts comment-reply <comment_id> "<repl
 
 ```bash
 # Navigation
-bun run ${CLAUDE_PLUGIN_ROOT}/cli/src/index.ts files                         # List changed files with links
+speck-review files                         # List changed files with links
 
 # Guided Review
-bun run ${CLAUDE_PLUGIN_ROOT}/cli/src/index.ts analyze [pr]                  # Analyze PR with clustering, output JSON
-bun run ${CLAUDE_PLUGIN_ROOT}/cli/src/index.ts state [show|clear]            # Show or clear review session state
-bun run ${CLAUDE_PLUGIN_ROOT}/cli/src/index.ts check-self-review <author>    # Check if reviewing own PR
-bun run ${CLAUDE_PLUGIN_ROOT}/cli/src/index.ts spec-context                  # Load Speck spec for current branch
+speck-review analyze [pr]                  # Analyze PR with clustering, output JSON
+speck-review state [show|clear]            # Show or clear review session state
+speck-review check-self-review <author>    # Check if reviewing own PR
+speck-review spec-context                  # Load Speck spec for current branch
 
 # Comments
-bun run ${CLAUDE_PLUGIN_ROOT}/cli/src/index.ts comment <file> <line> <body>  # Add line comment
-bun run ${CLAUDE_PLUGIN_ROOT}/cli/src/index.ts comment-reply <id> <body>     # Reply to existing comment
-bun run ${CLAUDE_PLUGIN_ROOT}/cli/src/index.ts comment-delete <id>           # Delete a comment
-bun run ${CLAUDE_PLUGIN_ROOT}/cli/src/index.ts list-comments                 # List all PR comments
+speck-review comment <file> <line> <body>  # Add line comment
+speck-review comment-reply <id> <body>     # Reply to existing comment
+speck-review comment-delete <id>           # Delete a comment
+speck-review list-comments                 # List all PR comments
 
 # Review
-bun run ${CLAUDE_PLUGIN_ROOT}/cli/src/index.ts review approve [body]         # Approve PR
-bun run ${CLAUDE_PLUGIN_ROOT}/cli/src/index.ts review request-changes <body> # Request changes
-bun run ${CLAUDE_PLUGIN_ROOT}/cli/src/index.ts review comment [body]         # Comment without approval
+speck-review review approve [body]         # Approve PR
+speck-review review request-changes <body> # Request changes
+speck-review review comment [body]         # Comment without approval
 
 # Utility (FR-027)
-bun run ${CLAUDE_PLUGIN_ROOT}/cli/src/index.ts link <file> [line]            # Generate navigation link
-bun run ${CLAUDE_PLUGIN_ROOT}/cli/src/index.ts actions                       # Display navigation action menu
-bun run ${CLAUDE_PLUGIN_ROOT}/cli/src/index.ts run-actions                   # Display review action menu
-bun run ${CLAUDE_PLUGIN_ROOT}/cli/src/index.ts review-table [--example]      # Generate formatted comment table
-bun run ${CLAUDE_PLUGIN_ROOT}/cli/src/index.ts submit-actions [body]         # Display submit review menu
-bun run ${CLAUDE_PLUGIN_ROOT}/cli/src/index.ts logs                          # Display log file locations
+speck-review link <file> [line]            # Generate navigation link
+speck-review actions                       # Display navigation action menu
+speck-review run-actions                   # Display review action menu
+speck-review review-table [--example]      # Generate formatted comment table
+speck-review submit-actions [body]         # Display submit review menu
+speck-review logs                          # Display log file locations
 ```
 
 ---
@@ -926,8 +926,8 @@ skip comments:** "skip 2" or "only post 1"
 After user says "post 1, 3":
 
 ```bash
-bun run ${CLAUDE_PLUGIN_ROOT}/cli/src/index.ts comment src/services/auth.ts 42 "Consider adding rate limiting to prevent brute force"
-bun run ${CLAUDE_PLUGIN_ROOT}/cli/src/index.ts comment src/middleware/requireAuth.ts 23 "Might be worth logging failed auth attempts"
+speck-review comment src/services/auth.ts 42 "Consider adding rate limiting to prevent brute force"
+speck-review comment src/middleware/requireAuth.ts 23 "Might be worth logging failed auth attempts"
 ```
 
 ### Terminal Format (CLI)
@@ -1047,9 +1047,9 @@ limiting and configurability.
 **Claude:**
 
 ```bash
-bun run ${CLAUDE_PLUGIN_ROOT}/cli/src/index.ts comment src/services/AuthService.ts 42 "Consider adding rate limiting on login attempts to prevent brute force"
-bun run ${CLAUDE_PLUGIN_ROOT}/cli/src/index.ts comment src/middleware/requireAuth.ts 23 "Might be worth logging failed auth attempts for security monitoring"
-bun run ${CLAUDE_PLUGIN_ROOT}/cli/src/index.ts review approve "Clean auth implementation! Left minor suggestions around rate limiting and logging."
+speck-review comment src/services/AuthService.ts 42 "Consider adding rate limiting on login attempts to prevent brute force"
+speck-review comment src/middleware/requireAuth.ts 23 "Might be worth logging failed auth attempts for security monitoring"
+speck-review review approve "Clean auth implementation! Left minor suggestions around rate limiting and logging."
 ```
 
 ```markdown

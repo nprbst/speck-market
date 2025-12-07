@@ -3,6 +3,22 @@ description: Review a GitHub pull request with Speck-aware context
 argument-hint: [pr-number]
 ---
 
+## Prerequisites Check
+
+**Before proceeding, verify the speck-review CLI is installed:**
+
+```bash
+which speck-review
+```
+
+**If the command is not found**, stop and ask the user to run `/speck-reviewer:init` first:
+
+> The `speck-review` CLI is not installed. Please run `/speck-reviewer:init` to install it globally, then try this command again.
+
+**Do not continue with the review if speck-review is not available.** The CLI is required for PR analysis, state management, and comment posting.
+
+---
+
 # PR Review Command
 
 First, use the Read tool to load the skill instructions from
@@ -33,7 +49,7 @@ assigned or requested as reviewer using the method in the skill.
 Check for existing review state:
 
 ```bash
-bun run ${CLAUDE_PLUGIN_ROOT}/cli/src/index.ts state show
+speck-review state show
 ```
 
 If state exists for this PR:
@@ -56,7 +72,7 @@ gh pr view <PR_NUMBER> --json title,body,state,author,baseRefName,headRefName,ad
 ### 4. Run Clustering Analysis
 
 ```bash
-bun run ${CLAUDE_PLUGIN_ROOT}/cli/src/index.ts analyze <PR_NUMBER>
+speck-review analyze <PR_NUMBER>
 ```
 
 This returns heuristic clusters. Refine them using LLM augmentation as described
@@ -65,13 +81,13 @@ in the skill.
 ### 5. Check Self-Review Mode
 
 ```bash
-bun run ${CLAUDE_PLUGIN_ROOT}/cli/src/index.ts check-self-review <PR_AUTHOR>
+speck-review check-self-review <PR_AUTHOR>
 ```
 
 ### 6. Load Speck Context (if available)
 
 ```bash
-bun run ${CLAUDE_PLUGIN_ROOT}/cli/src/index.ts spec-context
+speck-review spec-context
 ```
 
 If spec exists for the branch, include requirements in review context. If no

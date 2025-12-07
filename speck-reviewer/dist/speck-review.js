@@ -166,7 +166,12 @@ async function getCurrentBranch() {
 }
 async function postComment(prNumber, file, line, body) {
   try {
-    const result = await $`gh api repos/{owner}/{repo}/pulls/${prNumber}/comments \
+    const repoFullName = await getRepoFullName();
+    if (!repoFullName) {
+      logger.error("Failed to get repository name");
+      return null;
+    }
+    const result = await $`gh api repos/${repoFullName}/pulls/${prNumber}/comments \
       -f body=${body} \
       -f path=${file} \
       -F line=${line} \
@@ -180,7 +185,12 @@ async function postComment(prNumber, file, line, body) {
 }
 async function replyToComment(prNumber, commentId, body) {
   try {
-    await $`gh api repos/{owner}/{repo}/pulls/${prNumber}/comments/${commentId}/replies \
+    const repoFullName = await getRepoFullName();
+    if (!repoFullName) {
+      logger.error("Failed to get repository name");
+      return false;
+    }
+    await $`gh api repos/${repoFullName}/pulls/${prNumber}/comments/${commentId}/replies \
       -f body=${body}`.quiet();
     return true;
   } catch (error) {
@@ -190,7 +200,12 @@ async function replyToComment(prNumber, commentId, body) {
 }
 async function deleteComment(commentId) {
   try {
-    await $`gh api repos/{owner}/{repo}/pulls/comments/${commentId} -X DELETE`.quiet();
+    const repoFullName = await getRepoFullName();
+    if (!repoFullName) {
+      logger.error("Failed to get repository name");
+      return false;
+    }
+    await $`gh api repos/${repoFullName}/pulls/comments/${commentId} -X DELETE`.quiet();
     return true;
   } catch (error) {
     logger.error("Failed to delete comment:", error);
@@ -1354,7 +1369,37 @@ var init_logs = __esm(() => {
 
 // plugins/speck-reviewer/cli/src/index.ts
 init_logger();
-var VERSION = "1.0.0";
+// plugins/speck-reviewer/cli/package.json
+var package_default = {
+  name: "speck-review-cli",
+  version: "1.1.0",
+  description: "CLI for AI-powered PR review with Speck-aware context",
+  type: "module",
+  main: "src/index.ts",
+  bin: {
+    "speck-review": "dist/speck-review"
+  },
+  scripts: {
+    build: "bun build src/index.ts --compile --outfile dist/speck-review",
+    dev: "bun run src/index.ts",
+    test: "bun test",
+    typecheck: "tsc --noEmit"
+  },
+  author: {
+    name: "Nathan Prabst"
+  },
+  license: "MIT",
+  engines: {
+    bun: ">=1.0.0"
+  },
+  devDependencies: {
+    "@types/bun": "latest",
+    typescript: "^5.3.0"
+  }
+};
+
+// plugins/speck-reviewer/cli/src/index.ts
+var VERSION = package_default.version;
 var commands = {
   help: async () => {
     printHelp();

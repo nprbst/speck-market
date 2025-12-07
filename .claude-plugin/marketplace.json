@@ -33,7 +33,7 @@
       "name": "speck-reviewer",
       "source": "./speck-reviewer",
       "description": "AI-powered PR review with Speck-aware context and structured walkthroughs",
-      "version": "1.0.2",
+      "version": "1.1.0",
       "author": {
         "name": "Nathan Prabst"
       },

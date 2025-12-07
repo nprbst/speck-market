@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [speck-reviewer v1.1.0] - 2025-12-07
+
+### Added
+
+- **speck-reviewer**: add global CLI with bootstrap and init command
+- **version**: add marketplace target and improve changelog format
+
+### Fixed
+
+- **speck-reviewer**: resolve repo name for GitHub API calls
+- **speck-reviewer**: sync CLI version with plugin and improve version script
+
 ## [marketplace v1.1.1] - 2025-12-07
 
 ### Added
