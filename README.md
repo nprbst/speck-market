@@ -11,7 +11,7 @@ This marketplace provides plugins for specification-driven development and AI-as
 Install the marketplace:
 
 ```bash
-/marketplace install https://github.com/nprbst/speck-market
+/plugin marketplace add nprbst/speck-market
 ```
 
 This will make all plugins available with their commands and skills.
