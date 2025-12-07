@@ -1372,7 +1372,7 @@ init_logger();
 // plugins/speck-reviewer/cli/package.json
 var package_default = {
   name: "speck-review-cli",
-  version: "1.1.0",
+  version: "1.1.1",
   description: "CLI for AI-powered PR review with Speck-aware context",
   type: "module",
   main: "src/index.ts",
