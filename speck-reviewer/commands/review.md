@@ -3,22 +3,6 @@ description: Review a GitHub pull request with Speck-aware context
 argument-hint: [pr-number]
 ---
 
-## Prerequisites Check
-
-**Before proceeding, verify the speck-review CLI is installed:**
-
-```bash
-which speck-review
-```
-
-**If the command is not found**, stop and ask the user to run `/speck-reviewer:init` first:
-
-> The `speck-review` CLI is not installed. Please run `/speck-reviewer:init` to install it globally, then try this command again.
-
-**Do not continue with the review if speck-review is not available.** The CLI is required for PR analysis, state management, and comment posting.
-
----
-
 # PR Review Command
 
 First, use the Read tool to load the skill instructions from
@@ -51,6 +35,10 @@ Check for existing review state:
 ```bash
 speck-review state show
 ```
+
+**If exit code 127 (command not found):** Stop and tell the user:
+
+> The `speck-review` CLI is not installed. Please run `/speck-reviewer:init` to install it globally, then try this command again.
 
 If state exists for this PR:
 
