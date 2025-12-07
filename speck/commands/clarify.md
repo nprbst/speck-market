@@ -119,14 +119,14 @@ Execution steps:
           - Common patterns in similar implementations
           - Risk reduction (security, performance, maintainability)
           - Alignment with any explicit project goals or constraints visible in the spec
-       - Format the question output as follows (with blank lines between sections for clarity):
+       - Format the question output exactly as shown (preserve blank lines between sections):
 
        ```
        ## Question [N] of 5
 
-       **Recommended:** Option [X] - <reasoning (1-2 sentences explaining why this is the best choice)>
-
        **Question:** <The actual question text>
+
+       **Recommended:** Option [X] - <reasoning (1-2 sentences explaining why this is the best choice)>
 
        | Option | Description |
        |--------|-------------|
@@ -139,14 +139,14 @@ Execution steps:
        ```
 
     - For short‑answer style (no meaningful discrete options):
-       - Format the question output as follows (with blank lines between sections for clarity):
+       - Format the question output exactly as shown (preserve blank lines between sections):
 
        ```
        ## Question [N] of 5
 
-       **Suggested:** <your proposed answer> - <brief reasoning (1-2 sentences)>
-
        **Question:** <The actual question text>
+
+       **Suggested:** <your proposed answer> - <brief reasoning (1-2 sentences)>
 
        Format: Short answer (<=5 words). You can accept the suggestion by saying "yes" or "suggested", or provide your own answer.
        ```

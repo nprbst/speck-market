@@ -10208,7 +10208,7 @@ function buildSubcommandArgs(args, options, rawArgs) {
 }
 function createProgram() {
   const program2 = new Command;
-  program2.name("speck").description("Speck CLI - Claude Code-Optimized Specification Framework").version(getVersion(), "-V, --version", "Show version number").option("--json", "Output structured JSON for LLM parsing").option("--hook", "Output hook-formatted response for Claude Code hooks").hook("preAction", (thisCommand) => {
+  program2.name("speck").description("Speck CLI - Claude Code-Native Spec-Driven Development").version(getVersion(), "-V, --version", "Show version number").option("--json", "Output structured JSON for LLM parsing").option("--hook", "Output hook-formatted response for Claude Code hooks").hook("preAction", (thisCommand) => {
     const opts = thisCommand.opts();
     processGlobalOptions(opts);
   });
