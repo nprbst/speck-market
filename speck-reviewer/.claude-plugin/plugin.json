@@ -1,0 +1,25 @@
+{
+  "name": "speck-reviewer",
+  "description": "AI-assisted PR review with Speck-aware context and structured walkthroughs",
+  "version": "1.0.2",
+  "author": {
+    "name": "Nathan Prabst",
+    "email": "nathan@example.com"
+  },
+  "homepage": "https://github.com/nprbst/speck",
+  "repository": "https://github.com/nprbst/speck",
+  "license": "MIT",
+  "keywords": [
+    "code-review",
+    "pull-request",
+    "github",
+    "spec-aware",
+    "pr-review"
+  ],
+  "commands": {
+    "review": "commands/review.md"
+  },
+  "skills": {
+    "pr-review": "skills/pr-review/SKILL.md"
+  }
+}

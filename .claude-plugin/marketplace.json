@@ -6,14 +6,14 @@
   },
   "metadata": {
     "description": "Official Speck plugin marketplace for specification and planning tools",
-    "version": "1.0.0"
+    "version": "1.1.0"
   },
   "plugins": [
     {
       "name": "speck",
       "source": "./speck",
       "description": "Specification and planning workflow framework for Claude Code",
-      "version": "1.10.0",
+      "version": "1.10.2",
       "author": {
         "name": "Nathan Prabst"
       },
@@ -25,6 +25,26 @@
         "planning",
         "workflow",
         "feature-management"
+      ],
+      "category": "development-tools",
+      "strict": true
+    },
+    {
+      "name": "speck-reviewer",
+      "source": "./speck-reviewer",
+      "description": "AI-powered PR review with Speck-aware context and structured walkthroughs",
+      "version": "1.0.2",
+      "author": {
+        "name": "Nathan Prabst"
+      },
+      "homepage": "https://github.com/nprbst/speck",
+      "repository": "https://github.com/nprbst/speck",
+      "license": "MIT",
+      "keywords": [
+        "code-review",
+        "pull-request",
+        "github",
+        "spec-aware"
       ],
       "category": "development-tools",
       "strict": true

@@ -1,10 +1,10 @@
 # Speck Marketplace
 
-Official marketplace for the Speck plugin for Claude Code.
+Official marketplace for Speck plugins for Claude Code.
 
 ## About
 
-This marketplace provides the Speck plugin, a complete workflow framework for creating, planning, and implementing features using Claude Code.
+This marketplace provides plugins for specification-driven development and AI-assisted code review.
 
 ## Installation
 
@@ -14,21 +14,27 @@ Install the marketplace:
 /marketplace install https://github.com/nprbst/speck-market
 ```
 
-This will make the Speck plugin available with all its commands and agents.
+This will make all plugins available with their commands and skills.
 
 ## Available Plugins
 
 ### Speck - Specification and Planning Workflow
 
-The core Speck plugin provides a complete workflow framework for feature development:
+A complete workflow framework for feature development:
 
-#### Features
-
-- **9 Core Commands**: From specification to implementation
-- **2 Specialized Agents**: Transform scripts and commands automatically
-- **5 Templates**: Handlebars templates for specs, plans, tasks, constitution, and checklists
-- **Runtime Scripts**: Automated workflows for feature management
+- **Core Commands**: Specification, planning, and implementation workflows
+- **Templates**: Handlebars templates for specs, plans, tasks, and checklists
 - **Constitution Support**: Define and enforce project principles
+- **Hook Integration**: Automatic context loading
+
+### Speck-Reviewer - AI-Powered PR Review
+
+AI-assisted pull request review with structured walkthroughs:
+
+- **Guided Review Mode**: Cluster-based review for large PRs
+- **Speck-Aware Context**: Links reviews to feature specifications
+- **Comment Management**: Stage, refine, and batch-post comments
+- **State Persistence**: Resume reviews across sessions
 
 ## Documentation
 
