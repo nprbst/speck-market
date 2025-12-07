@@ -8735,6 +8735,11 @@ function createSpeckDirectory(repoRoot) {
         mkdirSync3(subdirPath, { recursive: true });
       }
     }
+    const gitignorePath = join4(speckDir, ".gitignore");
+    if (!existsSync8(gitignorePath)) {
+      writeFileSync2(gitignorePath, `# Machine-specific files
+`);
+    }
     return { created: !alreadyExists, path: speckDir };
   } catch {
     return null;
