@@ -17,6 +17,7 @@ SCRIPT_DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
 
 # Find the bundled CLI relative to bootstrap.sh
 # Plugin structure: speck-reviewer/src/cli/bootstrap.sh -> speck-reviewer/dist/speck-review.js
+# Note: dist/ is created by `bun build` during plugin packaging (see scripts/build-plugin.ts)
 ENTRYPOINT="${SCRIPT_DIR}/../../dist/speck-review.js"
 
 if [[ ! -f "$ENTRYPOINT" ]]; then

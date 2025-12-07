@@ -24,13 +24,16 @@ This command installs the `speck-review` CLI globally and configures auto-allow 
 Run these commands in order:
 
 ```bash
-# 1. Create ~/.local/bin if it doesn't exist
+# 1. Verify plugin is built (dist/ should exist)
+ls "${CLAUDE_PLUGIN_ROOT}/dist/speck-review.js" || echo "Warning: Plugin not built yet"
+
+# 2. Create ~/.local/bin if it doesn't exist
 mkdir -p ~/.local/bin
 
-# 2. Create symlink to bootstrap.sh
+# 3. Create symlink to bootstrap.sh
 ln -sf "${CLAUDE_PLUGIN_ROOT}/src/cli/bootstrap.sh" ~/.local/bin/speck-review
 
-# 3. Verify installation
+# 4. Verify installation
 speck-review version
 ```
 

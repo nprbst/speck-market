@@ -422,7 +422,7 @@ var init_clustering = __esm(() => {
   };
   CROSS_CUTTING_PATTERNS = {
     "Configuration changes": [/package\.json$/, /\.env/, /config\.(ts|js|json)$/, /tsconfig\.json$/],
-    "New dependencies": [/package\.json$/, /package-lock\.json$/, /yarn\.lock$/, /bun\.lockb$/],
+    "New dependencies": [/package\.json$/, /package-lock\.json$/, /yarn\.lock$/, /bun\.lockb?$/],
     "Database migrations": [/migrations?\//i, /\.sql$/],
     "CI/CD changes": [/\.github\//, /\.gitlab-ci/, /Dockerfile/, /docker-compose/],
     Documentation: [/README/, /CHANGELOG/, /docs\//]
@@ -463,8 +463,11 @@ async function saveState(session, repoRoot) {
   if (!existsSync(stateDir)) {
     mkdirSync(stateDir, { recursive: true });
   }
-  session.lastUpdated = new Date().toISOString();
-  const content = JSON.stringify(session, null, 2);
+  const sessionToSave = {
+    ...session,
+    lastUpdated: new Date().toISOString()
+  };
+  const content = JSON.stringify(sessionToSave, null, 2);
   writeFileSync(tempPath, content, "utf-8");
   renameSync(tempPath, statePath);
   logger.debug(`State saved to ${statePath}`);
@@ -543,7 +546,7 @@ var init_state = __esm(() => {
 });
 
 // plugins/speck-reviewer/cli/src/speck.ts
-import { existsSync as existsSync2, readFileSync as readFileSync2 } from "fs";
+import { existsSync as existsSync2, readFileSync as readFileSync2, readdirSync } from "fs";
 import { join as join2 } from "path";
 async function findSpecForBranch(branchName, repoRoot) {
   logger.debug("Finding spec for branch:", branchName);
@@ -571,8 +574,7 @@ async function findSpecForBranch(branchName, repoRoot) {
   }
   const specsDir = join2(repoRoot, "specs");
   if (existsSync2(specsDir)) {
-    const entries = Bun.spawnSync(["ls", specsDir]).stdout.toString().trim().split(`
-`);
+    const entries = readdirSync(specsDir);
     for (const entry of entries) {
       if (branchName.includes(entry) || entry.includes(branchName.replace(/^feature\//, ""))) {
         const specPath = join2(specsDir, entry, "spec.md");
@@ -1372,7 +1374,7 @@ init_logger();
 // plugins/speck-reviewer/cli/package.json
 var package_default = {
   name: "speck-review-cli",
-  version: "1.1.3",
+  version: "1.1.4",
   description: "CLI for AI-powered PR review with Speck-aware context",
   type: "module",
   main: "src/index.ts",
@@ -1521,11 +1523,11 @@ For more information: https://github.com/nprbst/speck
 async function main() {
   const args = process.argv.slice(2);
   if (args.includes("--version") || args.includes("-v")) {
-    commands.version?.([]);
+    await commands.version([]);
     return;
   }
   if (args.includes("--help") || args.includes("-h") || args.length === 0) {
-    commands.help?.([]);
+    await commands.help([]);
     return;
   }
   const command = args[0];
